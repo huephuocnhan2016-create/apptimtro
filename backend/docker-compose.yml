@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trotot
+      POSTGRES_PASSWORD: trotot_dev_password
+      POSTGRES_DB: trotot
+    ports:
+      - "5432:5432"
+    volumes:
+      - trotot_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  trotot_postgres_data:
