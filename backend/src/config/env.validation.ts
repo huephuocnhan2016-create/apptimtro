@@ -1,0 +1,29 @@
+import * as Joi from 'joi';
+
+export const environmentSchema = Joi.object({
+  NODE_ENV: Joi.string()
+    .valid('development', 'test', 'production')
+    .default('development'),
+  PORT: Joi.number().port().default(3000),
+  DATABASE_URL: Joi.string().uri({ scheme: ['postgres', 'postgresql'] }).required(),
+  JWT_ACCESS_SECRET: Joi.string().min(32).required(),
+  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
+  OTP_SECRET: Joi.string().min(32).required(),
+  ACCESS_TOKEN_SECONDS: Joi.number().integer().min(60).default(900),
+  REFRESH_TOKEN_DAYS: Joi.number().integer().min(1).default(30),
+  OTP_TTL_MINUTES: Joi.number().integer().min(1).max(15).default(5),
+  DEV_OTP_ENABLED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false)
+    .when('NODE_ENV', { is: 'production', then: Joi.valid(false) }),
+  CORS_ORIGIN: Joi.string().default('*').when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().required().invalid('*'),
+  }),
+  PUBLIC_API_URL: Joi.string().uri({ scheme: ['http', 'https'] }).optional(),
+  NOMINATIM_EMAIL: Joi.string().email().optional(),
+  AGORA_APP_ID: Joi.string().hex().length(32).allow(''),
+  AGORA_APP_CERTIFICATE: Joi.string().hex().length(32).allow(''),
+  FIREBASE_SERVICE_ACCOUNT: Joi.string().allow(''),
+}).and('AGORA_APP_ID', 'AGORA_APP_CERTIFICATE');
