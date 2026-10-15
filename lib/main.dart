@@ -14,10 +14,14 @@ bool firebaseAvailable = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Try to initialize Firebase with environment variables
   const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
   const appId = String.fromEnvironment('FIREBASE_APP_ID');
   const senderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
   const projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  
+  // Only initialize Firebase if all required environment variables are provided
   if ([apiKey, appId, senderId, projectId].every((value) => value.isNotEmpty)) {
     try {
       await Firebase.initializeApp(
@@ -29,10 +33,16 @@ Future<void> main() async {
         ),
       );
       firebaseAvailable = true;
-    } on FirebaseException catch (error) {
-      debugPrint('Firebase initialization failed: ${error.message}');
+      debugPrint('Firebase initialized successfully');
+    } catch (error) {
+      debugPrint('Firebase initialization failed: $error');
+      firebaseAvailable = false;
     }
+  } else {
+    debugPrint('Firebase configuration not provided, running without Firebase features');
+    firebaseAvailable = false;
   }
+  
   runApp(const ProviderScope(child: TroTotApp()));
 }
 
