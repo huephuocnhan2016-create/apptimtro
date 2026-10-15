@@ -32,7 +32,15 @@ final authRepositoryProvider = Provider(
     ref.watch(tokenStorageProvider),
   ),
 );
-final currentUserProvider = StateProvider<AppUser?>((ref) => null);
+final currentUserProvider = NotifierProvider<UserNotifier, AppUser?>(UserNotifier.new);
+
+class UserNotifier extends Notifier<AppUser?> {
+  @override
+  AppUser? build() => null;
+  
+  void setUser(AppUser? user) => state = user;
+  void clearUser() => state = null;
+}
 final roomApiProvider = Provider(
   (ref) => RoomApi(ref.watch(apiClientProvider)),
 );
