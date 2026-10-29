@@ -26,9 +26,6 @@ model User {
   refreshTokens RefreshToken[]
   rooms         Room[]
   favorites     Favorite[]
-  callsStarted  Call[]         @relation("CallCaller")
-  callsReceived Call[]         @relation("CallReceiver")
-  deviceTokens  DeviceToken[]
 
   @@map("users")
 }
@@ -63,7 +60,6 @@ model Room {
   landlord        User         @relation(fields: [landlordId], references: [id], onDelete: Cascade)
   images          RoomImage[]
   favorites       Favorite[]
-  calls           Call[]
 
   @@index([landlordId, createdAt])
   @@index([status, price])
@@ -94,47 +90,6 @@ model Favorite {
   @@unique([userId, roomId])
   @@index([userId, createdAt])
   @@map("favorites")
-}
-
-enum CallStatus {
-  RINGING
-  ACCEPTED
-  REJECTED
-  MISSED
-  ENDED
-}
-
-model Call {
-  id          String     @id @default(uuid()) @db.Uuid
-  callerId    String     @map("caller_id") @db.Uuid
-  receiverId  String     @map("receiver_id") @db.Uuid
-  roomId      String     @map("room_id") @db.Uuid
-  channelName String     @unique @map("channel_name") @db.VarChar(128)
-  status      CallStatus @default(RINGING)
-  startedAt   DateTime?  @map("started_at") @db.Timestamptz(3)
-  endedAt     DateTime?  @map("ended_at") @db.Timestamptz(3)
-  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  caller      User       @relation("CallCaller", fields: [callerId], references: [id], onDelete: Cascade)
-  receiver    User       @relation("CallReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  room        Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
-
-  @@index([callerId, createdAt])
-  @@index([receiverId, status, createdAt])
-  @@index([roomId, createdAt])
-  @@map("calls")
-}
-
-model DeviceToken {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  token     String   @unique @db.VarChar(2048)
-  platform  String?  @db.VarChar(20)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("device_tokens")
 }
 
 model RefreshToken {

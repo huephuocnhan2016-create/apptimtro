@@ -8,9 +8,6 @@ import '../features/auth/domain/user.dart';
 import '../features/rooms/data/room_api.dart';
 import '../features/rooms/data/room_repository.dart';
 import '../features/map/domain/location_service.dart';
-import '../features/calls/data/call_api.dart';
-import '../features/calls/data/call_repository.dart';
-import '../features/notifications/data/notification_service.dart';
 import 'network/api_client.dart';
 import 'storage/token_storage.dart';
 
@@ -48,12 +45,3 @@ final roomRepositoryProvider = Provider(
   (ref) => RoomRepository(ref.watch(roomApiProvider)),
 );
 final locationServiceProvider = Provider((_) => LocationService());
-final callApiProvider = Provider(
-  (ref) => CallApi(ref.watch(apiClientProvider)),
-);
-final callRepositoryProvider = Provider(
-  (ref) => CallRepository(ref.watch(callApiProvider)),
-);
-final notificationServiceProvider = Provider(
-  (ref) => NotificationService(ref.watch(apiClientProvider)),
-);

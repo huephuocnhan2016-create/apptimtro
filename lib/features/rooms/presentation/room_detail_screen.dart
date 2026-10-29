@@ -3,12 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../map/presentation/open_street_map_layers.dart';
-import '../../auth/domain/user.dart';
 import '../domain/room.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
@@ -23,7 +21,6 @@ class RoomDetailScreen extends ConsumerStatefulWidget {
 class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   late Future<Room> _room;
   bool _favorite = false;
-  bool _startingCall = false;
 
   @override
   void initState() {
@@ -173,7 +170,6 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                 CircleAvatar(
                   backgroundImage: NetworkImage(room.landlordAvatar!),
                 ),
-              if (room.landlordPhone != null) Text(room.landlordPhone!),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 10,
@@ -209,37 +205,6 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     ),
                     label: Text(_favorite ? 'Đã yêu thích' : 'Yêu thích'),
                   ),
-                  FilledButton.icon(
-                    onPressed: room.landlordPhone == null
-                        ? null
-                        : () async {
-                            final uri = Uri(
-                              scheme: 'tel',
-                              path: room.landlordPhone,
-                            );
-                            if (!await launchUrl(uri) && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Không thể mở ứng dụng gọi điện.',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                    icon: const Icon(Icons.call),
-                    label: const Text('Gọi điện'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed:
-                        _startingCall ||
-                            ref.read(currentUserProvider)?.role !=
-                                UserRole.student
-                        ? null
-                        : () => _startVideoCall(room),
-                    icon: const Icon(Icons.videocam_outlined),
-                    label: Text(_startingCall ? 'Đang gọi...' : 'Video Call'),
-                  ),
                 ],
               ),
             ],
@@ -247,28 +212,6 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         ),
       ],
     );
-  }
-
-  Future<void> _startVideoCall(Room room) async {
-    setState(() => _startingCall = true);
-    try {
-      final call = await ref.read(callRepositoryProvider).create(room.id);
-      if (mounted) {
-        context.push('/calls/${call.id}/outgoing');
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Không thể bắt đầu cuộc gọi: ${apiErrorMessage(error)}',
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _startingCall = false);
-    }
   }
 }
 

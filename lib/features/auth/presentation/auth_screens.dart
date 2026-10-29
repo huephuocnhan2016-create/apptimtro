@@ -245,17 +245,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   final _pin = TextEditingController();
   bool _busy = false;
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.devOtp?.isNotEmpty ?? false) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _pin.text = widget.devOtp!;
-      });
-    }
-  }
-
   Future<void> _verify() async {
     if (_pin.text.length != 6 || _busy) return;
     setState(() => _busy = true);
