@@ -22,6 +22,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   static const _fallback = LatLng(10.77, 106.66);
   final MapController _mapController = MapController();
   LatLng? _currentPosition;
+  String? _currentAddress;
   List<Room> _rooms = [];
   String? _error;
   bool _loading = true;
@@ -39,10 +40,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   Future<void> _loadNearby() async {
     try {
-      final position = await ref
-          .read(locationServiceProvider)
-          .currentPosition();
+      final locationService = ref.read(locationServiceProvider);
+      final position = await locationService.currentPosition();
       final center = LatLng(position.latitude, position.longitude);
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = center;
+        _currentAddress = null;
+      });
+      if (_mapReady) _centerOnUser(center);
       final rooms = await ref
           .read(roomRepositoryProvider)
           .nearby(
@@ -52,11 +58,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           );
       if (!mounted) return;
       setState(() {
-        _currentPosition = center;
         _rooms = rooms;
         _loading = false;
       });
-      if (_mapReady) _showInitialResults(rooms, center);
+      unawaited(_resolveAddress(position.latitude, position.longitude));
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -64,6 +69,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _resolveAddress(double latitude, double longitude) async {
+    final address = await ref
+        .read(locationServiceProvider)
+        .addressFrom(latitude, longitude);
+    if (!mounted || address == null) return;
+    setState(() => _currentAddress = address);
   }
 
   @override
@@ -126,7 +139,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               onMapReady: () {
                 _mapReady = true;
                 final position = _currentPosition;
-                if (position != null) _showInitialResults(_rooms, position);
+                if (position != null) _centerOnUser(position);
               },
               onPositionChanged: (camera, hasGesture) {
                 if (!hasGesture) return;
@@ -174,6 +187,34 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               child: const Icon(Icons.my_location),
             ),
           ),
+          if (_currentPosition != null)
+            Positioned(
+              left: 16,
+              right: 72,
+              bottom: 20,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.place_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _currentAddress ?? 'Đang xác định địa chỉ...',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (_areaNeedsSearch && !_loading)
             Positioned(
               top: 12,
@@ -298,24 +339,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  void _showInitialResults(List<Room> rooms, LatLng currentPosition) {
-    final points = rooms
-        .where((room) => room.latitude != null && room.longitude != null)
-        .map((room) => LatLng(room.latitude!, room.longitude!))
-        .toList();
-    if (points.isEmpty) {
-      _mapController.move(currentPosition, 13);
-      return;
-    }
-
-    final allPoints = [currentPosition, ...points];
-    final center = LatLng(
-      allPoints.map((point) => point.latitude).reduce((a, b) => a + b) /
-          allPoints.length,
-      allPoints.map((point) => point.longitude).reduce((a, b) => a + b) /
-          allPoints.length,
-    );
-    _mapController.move(center, 11);
+  void _centerOnUser(LatLng position) {
+    _mapController.move(position, 14);
   }
 
   void _showRoom(Room room) {

@@ -28,8 +28,6 @@
 
 ## Các Tính Năng Đã Bỏ Qua (Không Cần Thiết Để Test Core):
 - ❌ Google Maps API (cần API key)
-- ❌ Firebase Push Notifications (cần config)
-- ❌ Agora Video Calls (cần credentials)
 - ❌ Docker (sử dụng PostgreSQL có sẵn)
 
 ## Luồng Test Cơ Bản Khi App Build Xong:
@@ -83,8 +81,6 @@ npm run start:dev
 2. Test basic room browsing
 3. Test user registration flow
 4. Nếu cần Maps: cấu hình Google Maps API key
-5. Nếu cần notifications: setup Firebase
-6. Nếu cần video calls: setup Agora
 
 ---
 **Thời gian thiết lập**: 2026-10-11 10:38

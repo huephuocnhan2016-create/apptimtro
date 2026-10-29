@@ -28,10 +28,6 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ứng dụng cần vị trí để tìm phòng trọ gần bạn.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Ứng dụng cần camera để thực hiện cuộc gọi video.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Ứng dụng cần microphone để truyền âm thanh trong cuộc gọi.</string>
 	<key>GMSApiKey</key>
 	<string>$(MAPS_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>

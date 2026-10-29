@@ -23,7 +23,4 @@ export const environmentSchema = Joi.object({
   }),
   PUBLIC_API_URL: Joi.string().uri({ scheme: ['http', 'https'] }).optional(),
   NOMINATIM_EMAIL: Joi.string().email().optional(),
-  AGORA_APP_ID: Joi.string().hex().length(32).allow(''),
-  AGORA_APP_CERTIFICATE: Joi.string().hex().length(32).allow(''),
-  FIREBASE_SERVICE_ACCOUNT: Joi.string().allow(''),
-}).and('AGORA_APP_ID', 'AGORA_APP_CERTIFICATE');
+});

@@ -236,7 +236,11 @@ export class AuthService {
       });
       return stored.user;
     });
-    return this.createSession(rotated, nextToken, nextExpiresAt);
+    return {
+      accessToken: await this.signAccessToken(rotated),
+      refreshToken: nextToken,
+      user: this.serializeUser(rotated),
+    };
   }
 
   async logout(userId: string): Promise<void> {
@@ -309,13 +313,7 @@ export class AuthService {
     refreshToken = randomBytes(32).toString('base64url'),
     expiresAt = this.refreshExpiry(),
   ): Promise<TokenPair> {
-    const accessToken = await this.jwt.signAsync(
-      { sub: user.id, role: user.role, tokenType: 'access' },
-      {
-        secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.config.getOrThrow<number>('ACCESS_TOKEN_SECONDS'),
-      },
-    );
+    const accessToken = await this.signAccessToken(user);
     await this.prisma.refreshToken.create({
       data: {
         tokenHash: this.hashRefreshToken(refreshToken),
@@ -328,6 +326,16 @@ export class AuthService {
       refreshToken,
       user: this.serializeUser(user),
     };
+  }
+
+  private signAccessToken(user: User): Promise<string> {
+    return this.jwt.signAsync(
+      { sub: user.id, role: user.role, tokenType: 'access' },
+      {
+        secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+        expiresIn: this.config.getOrThrow<number>('ACCESS_TOKEN_SECONDS'),
+      },
+    );
   }
 
   private refreshExpiry(): Date {

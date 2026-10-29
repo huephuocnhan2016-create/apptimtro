@@ -45,21 +45,11 @@ class ProfileScreen extends ConsumerWidget {
               title: const Text('Quản lý phòng trọ'),
               onTap: () => context.push('/landlord'),
             ),
-          ListTile(
-            leading: const Icon(Icons.video_call_outlined),
-            title: const Text('Lịch sử cuộc gọi'),
-            onTap: () => context.push('/calls/history'),
-          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Đăng xuất'),
             onTap: () async {
-              try {
-                await ref.read(notificationServiceProvider).removeToken();
-              } catch (error) {
-                debugPrint('Could not unregister FCM token: $error');
-              }
               await ref.read(authRepositoryProvider).logout();
               ref.read(currentUserProvider.notifier).state = null;
               if (context.mounted) context.go('/welcome');

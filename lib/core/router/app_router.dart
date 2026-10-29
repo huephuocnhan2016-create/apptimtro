@@ -11,8 +11,6 @@ import '../../features/rooms/presentation/room_form.dart';
 import '../../features/rooms/presentation/room_search_screen.dart';
 import '../../features/landlord/presentation/landlord_screens.dart';
 import '../../features/favorites/presentation/favorites_screen.dart';
-import '../../features/calls/domain/call_session.dart';
-import '../../features/calls/presentation/call_screens.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
@@ -89,29 +87,6 @@ final appRouter = GoRouter(
     GoRoute(path: '/map', builder: (_, _) => const MapScreen()),
     GoRoute(path: '/map-picker', builder: (_, _) => const MapPickerScreen()),
     GoRoute(path: '/favorites', builder: (_, _) => const FavoritesScreen()),
-    GoRoute(
-      path: '/calls/history',
-      builder: (_, _) => const CallHistoryScreen(),
-    ),
-    GoRoute(
-      path: '/calls/:id/incoming',
-      builder: (_, state) =>
-          IncomingCallScreen(callId: state.pathParameters['id']!),
-    ),
-    GoRoute(
-      path: '/calls/:id/outgoing',
-      builder: (_, state) =>
-          OutgoingCallScreen(callId: state.pathParameters['id']!),
-    ),
-    GoRoute(
-      path: '/calls/:id/video',
-      builder: (_, state) {
-        final call = state.extra;
-        return call is CallSession
-            ? VideoCallScreen(call: call)
-            : IncomingCallScreen(callId: state.pathParameters['id']!);
-      },
-    ),
     GoRoute(path: '/rooms/search', builder: (_, _) => const RoomSearchScreen()),
     GoRoute(
       path: '/rooms/:id',

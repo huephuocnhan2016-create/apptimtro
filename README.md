@@ -1,8 +1,8 @@
 # Trọ Tốt
 
 Flutter app for finding rental rooms in Vietnam. The existing phone OTP
-authentication is extended with PostGIS room discovery, favorites, landlord
-room management, Firebase push notifications, and Agora video calls.
+authentication is extended with PostGIS room discovery, favorites, and landlord
+room management.
 
 ## 1. Project overview
 
@@ -11,8 +11,6 @@ room management, Firebase push notifications, and Agora video calls.
 - Database: PostgreSQL 16 + PostGIS.
 - Maps and location: OpenStreetMap via `flutter_map`, Geolocator, Permission
   Handler.
-- Push: Firebase Cloud Messaging (optional until configured).
-- Video: Agora RTC Engine, with RTC tokens issued only by the backend.
 - Room images: local filesystem adapter; storage is abstracted for a future
   Cloudinary/S3 provider.
 
@@ -30,7 +28,6 @@ refresh tokens are rotated and only their SHA-256 hashes are stored.
 - Node.js 20+
 - Docker Desktop, or PostgreSQL 16 with PostGIS 3.4+
 - Android Studio/Xcode for native builds
-- Optional: Firebase and Agora accounts for those providers
 
 ## 4. PostgreSQL and PostGIS
 
@@ -48,8 +45,8 @@ allows `CREATE EXTENSION postgis`; configure `DATABASE_URL` accordingly.
 
 ## 5. Backend environment
 
-Set the values in `backend/.env`. Generate three different random secrets of
-at least 32 characters for JWT access, JWT refresh, and OTP. The committed
+Set the values in `backend/.env`. Generate three different random secrets of at
+least 32 characters for JWT access, JWT refresh, and OTP. The committed
 `.env.example` contains placeholders only.
 
 | Variable | Purpose |
@@ -62,9 +59,6 @@ at least 32 characters for JWT access, JWT refresh, and OTP. The committed
 | `CORS_ORIGIN` | Comma-separated allowed origins; `*` is rejected in production |
 | `PUBLIC_API_URL` | Public backend origin used in local image URLs |
 | `NOMINATIM_EMAIL` | Optional contact identifier sent with Nominatim address lookups |
-| `AGORA_APP_ID` | Agora application ID |
-| `AGORA_APP_CERTIFICATE` | Agora server-only certificate; never add to Flutter |
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin service account JSON on the server; keep private |
 
 Set `PUBLIC_API_URL` to an address reachable by the device (for example
 `http://10.0.2.2:3000` for Android Emulator, or your development LAN URL).
@@ -91,42 +85,14 @@ The app displays OpenStreetMap attribution in its map views.
 - Existing address-only rooms can be geocoded by editing and saving them again.
 - Seed/create AVAILABLE rooms with valid coordinates to see API-backed markers.
 
-## 7. Firebase FCM
-
-Create a Firebase project and register Android/iOS apps with the matching
-application identifiers. Configure APNs for iOS push delivery.
-
-- On Android/iOS, provide the native Firebase app configuration required by
-  the Firebase Flutter plugins (`google-services.json` / `GoogleService-Info.plist`)
-  without committing private project credentials.
-- Pass `FIREBASE_API_KEY`, `FIREBASE_APP_ID`,
-  `FIREBASE_MESSAGING_SENDER_ID`, and `FIREBASE_PROJECT_ID` as Dart defines.
-- Set `FIREBASE_SERVICE_ACCOUNT` in backend `.env` to the service account JSON
-  (escape newlines if stored on one line). It is used only by Firebase Admin.
-- The app requests notification permission and registers/rotates the device
-  token after login. Incoming call notifications open the in-app accept/reject
-  screen. Push is disabled if Firebase Admin is not configured.
-
-## 8. Agora video calls
-
-Create an Agora project and obtain App ID and App Certificate. Set both server
-variables in `backend/.env`; the API returns RTC credentials only to a
-participant after an accepted call. Never include the certificate in Flutter,
-app build arguments, logs, or source control.
-
-The Flutter app requires camera/microphone permission. A physical Android/iOS
-device or a properly configured emulator is recommended for media testing.
-Video calls cannot connect until both Agora and FCM are configured and a
-landlord has registered an FCM token.
-
-## 9. Image storage
+## 7. Image storage
 
 The current `StorageService` implementation writes image files to
 `backend/uploads/` and returns a URL under `PUBLIC_API_URL`. PostgreSQL stores
 only image metadata and URL. `uploads/` is ignored by Git. Replace the provider
 behind the storage abstraction to integrate Cloudinary or S3.
 
-## 10. Run development
+## 8. Run development
 
 Backend:
 
@@ -139,18 +105,13 @@ Flutter, from project root:
 
 ```powershell
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api `
-  --dart-define=FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY `
-  --dart-define=FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID `
-  --dart-define=FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID `
-  --dart-define=FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api
 ```
 
 Use `http://localhost:3000/api` for a local iOS simulator or the computer's
-LAN address for a physical device. Flutter Web may require browser-specific
-Firebase configuration.
+LAN address for a physical device.
 
-## 11. Android and iOS builds
+## 9. Android and iOS builds
 
 ```powershell
 flutter build apk --dart-define=API_BASE_URL=YOUR_API_URL
@@ -158,11 +119,10 @@ flutter build apk --dart-define=API_BASE_URL=YOUR_API_URL
 flutter build ios --dart-define=API_BASE_URL=YOUR_API_URL
 ```
 
-Configure signing, release Firebase app settings, iOS APNs entitlements, and
-location/camera/microphone descriptions before publishing. Do not use a
-development API over plain HTTP for a release build.
+Configure signing, release app identifiers, and location descriptions before
+publishing. Do not use a development API over plain HTTP for a release build.
 
-## 12. API documentation
+## 10. API documentation
 
 With backend running, open `http://localhost:3000/docs`. Requests use a
 consistent `{ success, message, data }` envelope; errors use
@@ -195,27 +155,17 @@ comma-separated `amenities`, optional coordinates and `radius`; sort accepts
 `distance`, `price_asc`, `price_desc`, `newest`. Radius search is executed in
 PostGIS, not in the client.
 
-### Calls and notifications
+## 11. Database structure
 
-- `POST /api/calls` with `{ roomId }` (student initiates; receiver is resolved
-  from that room's landlord)
-- `GET /api/calls`, `GET /api/calls/:id`
-- `POST /api/calls/:id/accept`, `/reject`, `/end`
-- `POST /api/notifications/device-token`,
-  `DELETE /api/notifications/device-token`
-
-All call routes require JWT and enforce caller/receiver participation. Agora
-tokens are issued only for accepted calls.
-
-## 13. Database structure
-
-- Existing: `users`, `refresh_tokens`, `phone_verifications`
+- `users`, `refresh_tokens`, `phone_verifications`
 - Rooms: `rooms`, `room_images`, `favorites`
-- Calls and push registration: `calls`, `device_tokens`
 - `rooms.location` is PostGIS geography(Point,4326), maintained from latitude /
   longitude with a GiST index.
 
-## 14. Verification
+The video call and push notification tables (`calls`, `device_tokens`) were
+removed; migration `20261029120000_remove_video_calls_and_push` drops them.
+
+## 12. Verification
 
 ```powershell
 flutter analyze
@@ -227,16 +177,14 @@ npx.cmd prisma validate
 npx.cmd prisma migrate status
 ```
 
-## 15. Current provider limitations
+## 13. Current provider limitations
 
-Push delivery requires real Firebase credentials and iOS APNs setup. Video
-media requires valid Agora credentials and device permissions. No chat or
-payment workflow is implemented. Local image storage is intended for
+The app has no chat or payment workflow. Local image storage is intended for
 development, not horizontally scaled production deployments.
 
-## 16. Production recommendations
+## 14. Production recommendations
 
-Use HTTPS, restrict CORS and provider keys, rotate secrets, use a production
-OTP/SMS provider, persistent shared storage (S3/Cloudinary), durable distributed
-rate limiting, database backups, call timeout/background cleanup, observability,
-and end-to-end device testing. Do not enable `DEV_OTP_ENABLED` in production.
+Use HTTPS, restrict CORS, rotate secrets, use a production OTP/SMS provider,
+persistent shared storage (S3/Cloudinary), durable distributed rate limiting,
+database backups, observability, and end-to-end device testing. Do not enable
+`DEV_OTP_ENABLED` in production.
