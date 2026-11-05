@@ -35,13 +35,19 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Trọ Tốt API')
-    .setDescription('Authentication, room search, calls, notifications, and user API.')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swaggerConfig));
+  if (config.get<string>('NODE_ENV') !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Trọ Tốt API')
+      .setDescription('Authentication, room search, favorites, and user API.')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    SwaggerModule.setup(
+      'docs',
+      app,
+      SwaggerModule.createDocument(app, swaggerConfig),
+    );
+  }
 
   await app.listen(config.getOrThrow<number>('PORT'), '0.0.0.0');
 }

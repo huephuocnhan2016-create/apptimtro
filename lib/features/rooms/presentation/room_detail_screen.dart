@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -169,6 +170,38 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               if (room.landlordAvatar != null)
                 CircleAvatar(
                   backgroundImage: NetworkImage(room.landlordAvatar!),
+                ),
+              if (room.landlordPhone != null)
+                Row(
+                  children: [
+                    Expanded(
+                      child: SelectableText(
+                        'SĐT: ${room.landlordPhone}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Sao chép số điện thoại',
+                      icon: const Icon(Icons.copy),
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: room.landlordPhone!),
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đã sao chép số điện thoại'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  'SĐT chủ trọ: Chưa cập nhật',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               const SizedBox(height: 16),
               Wrap(

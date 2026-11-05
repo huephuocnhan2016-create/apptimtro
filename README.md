@@ -101,6 +101,22 @@ cd backend
 npm.cmd run start:dev
 ```
 
+Demo data:
+
+```powershell
+cd backend
+npx.cmd prisma db seed
+```
+
+`prisma/seed.mjs` truncates every table and creates 1 landlord account
+(`+84908000001`, "Chủ trọ TP.HCM") plus 100 rooms: 2-3 rooms in each of the 40
+communes in `prisma/data/vn_communes_sample.json`, all of them in Thành phố Hồ
+Chí Minh. There are no student accounts and no favourites. Coordinates and
+commune names come from OpenStreetMap administrative boundaries; regenerate
+the sample with `node tools/build_province_membership.mjs` then
+`node tools/select_communes.mjs 40 "Hồ Chí Minh"` (needs internet, dumps land
+in the ignored `tools/.cache/`). Prices are synthetic.
+
 Flutter, from project root:
 
 ```powershell

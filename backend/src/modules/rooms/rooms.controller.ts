@@ -10,6 +10,7 @@ import { memoryStorage } from 'multer';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RoomViewThrottleGuard } from '../../common/guards/room-view-throttle.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AvailabilityDto } from './dto/availability.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
@@ -79,7 +80,7 @@ export class RoomsController {
 
   @Get(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RoomViewThrottleGuard)
   getOne(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
     return this.rooms.getOne(id, user);
   }
