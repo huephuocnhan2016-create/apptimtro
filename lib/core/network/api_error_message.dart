@@ -6,6 +6,10 @@ String apiErrorMessage(Object error) {
   if (error is! DioException) return error.toString();
   final status = error.response?.statusCode;
   final response = error.response?.data;
+  final code = response is Map<String, dynamic> ? response['code'] : null;
+  if (code == 'RATE_LIMITED') {
+    return 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.';
+  }
   final message = response is Map<String, dynamic> ? response['message'] : null;
   if (message is String && message.isNotEmpty) return message;
   if (message is List && message.isNotEmpty) return message.join(', ');

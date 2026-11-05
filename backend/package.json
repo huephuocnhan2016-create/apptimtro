@@ -52,6 +52,9 @@
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.71.1"
   },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
   "jest": {
     "moduleFileExtensions": [
       "js",

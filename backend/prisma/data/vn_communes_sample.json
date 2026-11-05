@@ -1,0 +1,322 @@
+[
+ {
+  "id": 2766949,
+  "name": "Phường Phú Thuận",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.7236808,
+  "lon": 106.7495439
+ },
+ {
+  "id": 3610160,
+  "name": "Phường Rạch Dừa",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.3909143,
+  "lon": 107.1020357
+ },
+ {
+  "id": 3870770,
+  "name": "Phường Đông Hòa",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.8939951,
+  "lon": 106.8044534
+ },
+ {
+  "id": 6892359,
+  "name": "Phường Tân Sơn Nhì",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.8012148,
+  "lon": 106.6240723
+ },
+ {
+  "id": 8385623,
+  "name": "Xã Xuyên Mộc",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.5495324,
+  "lon": 107.4598328
+ },
+ {
+  "id": 15328433,
+  "name": "Xã Minh Thạnh",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.4439081,
+  "lon": 106.4686961
+ },
+ {
+  "id": 2766950,
+  "name": "Phường Tân Hưng",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.7357264,
+  "lon": 106.7054606
+ },
+ {
+  "id": 3610170,
+  "name": "Phường Phước Thắng",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.4250294,
+  "lon": 107.164867
+ },
+ {
+  "id": 6890889,
+  "name": "Phường Phú Thạnh",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.7714801,
+  "lon": 106.6273806
+ },
+ {
+  "id": 6892362,
+  "name": "Phường Tây Thạnh",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.8139639,
+  "lon": 106.6215883
+ },
+ {
+  "id": 6941014,
+  "name": "Phường Thới An",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.8784701,
+  "lon": 106.6679617
+ },
+ {
+  "id": 15044265,
+  "name": "Xã Trừ Văn Thố",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.3400043,
+  "lon": 106.5940872
+ },
+ {
+  "id": 15350008,
+  "name": "Xã Phước Hòa",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.2535495,
+  "lon": 106.7793705
+ },
+ {
+  "id": 2766953,
+  "name": "Phường Tân Mỹ",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.7181556,
+  "lon": 106.7250869
+ },
+ {
+  "id": 3610162,
+  "name": "Phường Vũng Tàu",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.3538299,
+  "lon": 107.0779515
+ },
+ {
+  "id": 3610394,
+  "name": "Xã Long Điền",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.4685835,
+  "lon": 107.2164341
+ },
+ {
+  "id": 4132582,
+  "name": "Phường Long Hương",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.5069667,
+  "lon": 107.1487996
+ },
+ {
+  "id": 5485644,
+  "name": "Phường Phú Mỹ",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.601818,
+  "lon": 107.0439223
+ },
+ {
+  "id": 6928030,
+  "name": "Phường Trung Mỹ Tây",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.8599165,
+  "lon": 106.6224163
+ },
+ {
+  "id": 7342307,
+  "name": "Phường Long Bình",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.8623926,
+  "lon": 106.8326215
+ },
+ {
+  "id": 11379195,
+  "name": "Xã Bình Châu",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.5787615,
+  "lon": 107.531438
+ },
+ {
+  "id": 13477633,
+  "name": "Phường Bến Cát",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.2043223,
+  "lon": 106.6316765
+ },
+ {
+  "id": 15328440,
+  "name": "Xã Dầu Tiếng",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.3307578,
+  "lon": 106.3999796
+ },
+ {
+  "id": 15350042,
+  "name": "Xã Phước Thành",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.3850996,
+  "lon": 106.7564635
+ },
+ {
+  "id": 2766956,
+  "name": "Phường Tân Thuận",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.7576088,
+  "lon": 106.7342928
+ },
+ {
+  "id": 3610360,
+  "name": "Xã Long Sơn",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.4489753,
+  "lon": 107.0979942
+ },
+ {
+  "id": 4137054,
+  "name": "Phường Tam Long",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.5289618,
+  "lon": 107.2143439
+ },
+ {
+  "id": 6190340,
+  "name": "Xã Đất Đỏ",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.5182582,
+  "lon": 107.3085229
+ },
+ {
+  "id": 6915821,
+  "name": "Phường An Lạc",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.7346041,
+  "lon": 106.6110767
+ },
+ {
+  "id": 7138136,
+  "name": "Phường Thủ Đức",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.8369844,
+  "lon": 106.7566581
+ },
+ {
+  "id": 7468177,
+  "name": "Xã Cần Giờ",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.4452407,
+  "lon": 106.925822
+ },
+ {
+  "id": 7468178,
+  "name": "Xã An Thới Đông",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.5031964,
+  "lon": 106.8076217
+ },
+ {
+  "id": 7621976,
+  "name": "Xã An Nhơn Tây",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.1018804,
+  "lon": 106.485562
+ },
+ {
+  "id": 7629221,
+  "name": "Xã Tân An Hội",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.9702915,
+  "lon": 106.4707633
+ },
+ {
+  "id": 7867844,
+  "name": "Xã Phước Hải",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.4384477,
+  "lon": 107.3104752
+ },
+ {
+  "id": 10590955,
+  "name": "Phường Chánh Hiệp",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.0184881,
+  "lon": 106.6402879
+ },
+ {
+  "id": 13477425,
+  "name": "Phường Tân Uyên",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.0914018,
+  "lon": 106.8182424
+ },
+ {
+  "id": 15044266,
+  "name": "Xã Bàu Bàng",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.273214,
+  "lon": 106.6259094
+ },
+ {
+  "id": 15350067,
+  "name": "Xã Phú Giáo",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 11.3071308,
+  "lon": 106.8642415
+ },
+ {
+  "id": 3616747,
+  "name": "Phường Tam Thắng",
+  "province": "Thành phố Hồ Chí Minh",
+  "region": "NAM",
+  "lat": 10.3686977,
+  "lon": 107.0973646
+ }
+]

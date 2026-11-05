@@ -60,3 +60,7 @@ backend/node_modules/
 backend/.env
 backend/uploads/
 backend/logs/
+
+# Du lieu OSM tai ve + backup DB (khong commit)
+tools/.cache/
+backup/
