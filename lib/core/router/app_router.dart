@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/user.dart';
 import '../../features/auth/presentation/auth_screens.dart';
+import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/map/presentation/map_screen.dart';
@@ -92,6 +94,18 @@ final appRouter = GoRouter(
       path: '/rooms/:id',
       builder: (_, state) =>
           RoomDetailScreen(roomId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/chat',
+      builder: (_, state) {
+        final room = state.extra;
+        if (room is! Room) {
+          return const Scaffold(
+            body: Center(child: Text('Không xác định được chủ trọ để chat.')),
+          );
+        }
+        return ChatScreen(room: room);
+      },
     ),
     GoRoute(
       path: '/landlord',
