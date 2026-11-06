@@ -19,6 +19,7 @@ class Room {
     this.distance,
     this.amenities = const [],
     this.images = const [],
+    this.landlordId,
     this.landlordName,
     this.landlordAvatar,
     this.landlordPhone,
@@ -44,6 +45,7 @@ class Room {
   final double? distance;
   final List<String> amenities;
   final List<String> images;
+  final String? landlordId;
   final String? landlordName;
   final String? landlordAvatar;
   final String? landlordPhone;
@@ -82,6 +84,9 @@ class Room {
           .whereType<String>()
           .toList(),
       images: imageList,
+      landlordId: landlord is Map<String, dynamic>
+          ? landlord['id'] as String?
+          : null,
       landlordName: landlord is Map<String, dynamic>
           ? landlord['fullName'] as String?
           : null,

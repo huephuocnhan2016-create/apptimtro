@@ -107,7 +107,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                   return false;
                 }
               },
-              child: RoomListTile(room: room),
+              child: RoomListTile(
+                room: room,
+                onChat: room.landlordId == null
+                    ? null
+                    : () => context.push('/chat', extra: room),
+              ),
             );
           },
         );

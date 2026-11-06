@@ -221,9 +221,10 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
 }
 
 class RoomListTile extends StatelessWidget {
-  const RoomListTile({required this.room, super.key});
+  const RoomListTile({required this.room, this.onChat, super.key});
 
   final Room room;
+  final VoidCallback? onChat;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -268,6 +269,12 @@ class RoomListTile extends StatelessWidget {
               ),
             ),
           ),
+          if (onChat != null)
+            IconButton(
+              tooltip: 'Nhắn tin với chủ trọ',
+              icon: const Icon(Icons.chat_bubble_outline),
+              onPressed: onChat,
+            ),
         ],
       ),
     ),
