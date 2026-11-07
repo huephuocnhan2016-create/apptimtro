@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "841649036734",
+    "project_id": "apptimtro-5e6d1",
+    "storage_bucket": "apptimtro-5e6d1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:841649036734:android:9a24d0178de3e7c6806def",
+        "android_client_info": {
+          "package_name": "com.example.apptimtro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_CIDlnX4qhXDJALZtZca0VhslYWO71dU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:841649036734:android:5344a91f3305ce2d806def",
+        "android_client_info": {
+          "package_name": "com.trotot.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_CIDlnX4qhXDJALZtZca0VhslYWO71dU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
