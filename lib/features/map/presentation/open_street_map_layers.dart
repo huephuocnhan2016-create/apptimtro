@@ -11,7 +11,7 @@ RichAttributionWidget openStreetMapAttribution() => RichAttributionWidget(
   attributions: [
     TextSourceAttribution(
       'OpenStreetMap contributors',
-      onTap: () => launchUrl(Uri.parse('https://opflutter build apk --debugenstreetmap.org/copyright')),
+      onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
     ),
   ],
 );
