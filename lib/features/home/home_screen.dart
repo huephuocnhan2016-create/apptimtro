@@ -93,6 +93,11 @@ class _HomeLanding extends StatelessWidget {
         icon: const Icon(Icons.map_outlined),
         label: const Text('Khám phá trên bản đồ'),
       ),
+      OutlinedButton.icon(
+        onPressed: () => context.push('/chats'),
+        icon: const Icon(Icons.chat_outlined),
+        label: const Text('Tin nhắn'),
+      ),
       if (isLandlord) ...[
         const SizedBox(height: 20),
         Card(

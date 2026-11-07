@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/user.dart';
 import '../../features/auth/presentation/auth_screens.dart';
+import '../../features/chat/domain/conversation.dart';
+import '../../features/chat/presentation/chat_list_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
@@ -89,6 +91,24 @@ final appRouter = GoRouter(
     GoRoute(path: '/map', builder: (_, _) => const MapScreen()),
     GoRoute(path: '/map-picker', builder: (_, _) => const MapPickerScreen()),
     GoRoute(path: '/favorites', builder: (_, _) => const FavoritesScreen()),
+    GoRoute(path: '/chats', builder: (_, _) => const ChatListScreen()),
+    GoRoute(
+      path: '/chats/thread',
+      builder: (_, state) {
+        final conversation = state.extra;
+        if (conversation is! ChatConversation) {
+          return const Scaffold(
+            body: Center(child: Text('Không xác định được cuộc trò chuyện.')),
+          );
+        }
+        return ChatScreen.withConversation(
+          conversationId: conversation.id,
+          peerUid: conversation.participantId,
+          peerName: conversation.participantName ?? 'người dùng',
+          roomId: conversation.roomId,
+        );
+      },
+    ),
     GoRoute(path: '/rooms/search', builder: (_, _) => const RoomSearchScreen()),
     GoRoute(
       path: '/rooms/:id',

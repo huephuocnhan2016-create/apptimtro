@@ -1,10 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../features/auth/data/auth_api.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/data/user_api.dart';
 import '../features/auth/domain/user.dart';
+import '../features/chat/data/chat_api.dart';
+import '../features/chat/data/message_repository.dart';
 import '../features/rooms/data/room_api.dart';
 import '../features/rooms/data/room_repository.dart';
 import '../features/map/domain/location_service.dart';
@@ -45,3 +49,31 @@ final roomRepositoryProvider = Provider(
   (ref) => RoomRepository(ref.watch(roomApiProvider)),
 );
 final locationServiceProvider = Provider((_) => LocationService());
+
+// ===== Firebase / chat =====
+final chatApiProvider = Provider(
+  (ref) => ChatApi(ref.watch(apiClientProvider)),
+);
+final firebaseAuthProvider = Provider((_) => FirebaseAuth.instance);
+final firestoreProvider = Provider((_) => FirebaseFirestore.instance);
+final messageRepositoryProvider = Provider(
+  (ref) => MessageRepository(
+    ref.watch(chatApiProvider),
+    ref.watch(firestoreProvider),
+  ),
+);
+
+// Access token của app chỉ sống 900 giây nên không thể sign-in Firebase một lần
+// rồi quên: provider này chạy lại mỗi lần đổi user; còn khi JWT hết hạn,
+// interceptor trong ApiClient tự refresh trước khi GET /auth/firebase-token.
+final firebaseSignInProvider = FutureProvider<User?>((ref) async {
+  final appUser = ref.watch(currentUserProvider);
+  final auth = ref.watch(firebaseAuthProvider);
+  if (appUser == null) {
+    if (auth.currentUser != null) await auth.signOut();
+    return null;
+  }
+  final token = await ref.watch(chatApiProvider).firebaseToken();
+  final credential = await auth.signInWithCustomToken(token);
+  return credential.user;
+});
