@@ -23,4 +23,7 @@ export const environmentSchema = Joi.object({
   }),
   PUBLIC_API_URL: Joi.string().uri({ scheme: ['http', 'https'] }).optional(),
   NOMINATIM_EMAIL: Joi.string().email().optional(),
+  FIREBASE_PROJECT_ID: Joi.string().required(),
+  FIREBASE_CLIENT_EMAIL: Joi.string().required(),
+  FIREBASE_PRIVATE_KEY: Joi.string().required(),
 });
