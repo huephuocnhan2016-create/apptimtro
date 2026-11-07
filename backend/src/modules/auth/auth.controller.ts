@@ -17,6 +17,7 @@ import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
+import { FirebaseTokenService } from './firebase-token.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -26,7 +27,10 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly firebaseTokenService: FirebaseTokenService,
+  ) {}
 
   @Post('send-otp')
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
@@ -81,5 +85,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Get the authenticated account' })
   me(@CurrentUser() user: User) {
     return this.auth.serializeUser(user);
+  }
+
+  @Get('firebase-token')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get Firebase custom token for chat integration' })
+  async getFirebaseToken(@CurrentUser() user: User) {
+    const token = await this.firebaseTokenService.createCustomToken(user.id, user.role);
+    return { firebaseToken: token };
   }
 }
