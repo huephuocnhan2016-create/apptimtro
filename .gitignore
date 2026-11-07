@@ -59,6 +59,8 @@ backend/node_modules/
 backend/.env
 backend/uploads/
 backend/logs/
+backend/firebase-service-account.json
+**/serviceAccount*.json
 
 # Du lieu OSM tai ve + backup DB (khong commit)
 tools/.cache/
