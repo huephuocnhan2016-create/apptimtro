@@ -1,4 +1,4 @@
-package com.example.apptimtro
+package com.trotot.app
 
 import io.flutter.embedding.android.FlutterActivity
 

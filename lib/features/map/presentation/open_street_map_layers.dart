@@ -3,7 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 TileLayer openStreetMapTileLayer() => TileLayer(
   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  userAgentPackageName: 'com.example.apptimtro',
+  userAgentPackageName: 'com.trotot.app',
 );
 
 RichAttributionWidget openStreetMapAttribution() => RichAttributionWidget(
@@ -11,7 +11,7 @@ RichAttributionWidget openStreetMapAttribution() => RichAttributionWidget(
   attributions: [
     TextSourceAttribution(
       'OpenStreetMap contributors',
-      onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
+      onTap: () => launchUrl(Uri.parse('https://opflutter build apk --debugenstreetmap.org/copyright')),
     ),
   ],
 );
