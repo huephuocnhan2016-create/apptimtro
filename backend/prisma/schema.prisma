@@ -26,6 +26,8 @@ model User {
   refreshTokens RefreshToken[]
   rooms         Room[]
   favorites     Favorite[]
+  conversationsAsStudent  Conversation[] @relation("studentChats")
+  conversationsAsLandlord Conversation[] @relation("landlordChats")
 
   @@map("users")
 }
@@ -60,6 +62,7 @@ model Room {
   landlord        User         @relation(fields: [landlordId], references: [id], onDelete: Cascade)
   images          RoomImage[]
   favorites       Favorite[]
+  conversations   Conversation[]
 
   @@index([landlordId, createdAt])
   @@index([status, price])
@@ -90,6 +93,23 @@ model Favorite {
   @@unique([userId, roomId])
   @@index([userId, createdAt])
   @@map("favorites")
+}
+
+model Conversation {
+  id         String   @id @default(uuid()) @db.Uuid
+  studentId  String   @map("student_id")  @db.Uuid
+  landlordId String   @map("landlord_id") @db.Uuid
+  roomId     String   @map("room_id")     @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  student   User @relation("studentChats",  fields: [studentId],  references: [id], onDelete: Cascade)
+  landlord  User @relation("landlordChats", fields: [landlordId], references: [id], onDelete: Cascade)
+  room      Room @relation(fields: [roomId], references: [id],    onDelete: Cascade)
+
+  @@unique([studentId, roomId])
+  @@index([studentId, createdAt])
+  @@index([landlordId, createdAt])
+  @@map("conversations")
 }
 
 model RefreshToken {
