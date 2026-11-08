@@ -59,6 +59,9 @@ least 32 characters for JWT access, JWT refresh, and OTP. The committed
 | `CORS_ORIGIN` | Comma-separated allowed origins; `*` is rejected in production |
 | `PUBLIC_API_URL` | Public backend origin used in local image URLs |
 | `NOMINATIM_EMAIL` | Optional contact identifier sent with Nominatim address lookups |
+| `VNPAY_TMN_CODE`, `VNPAY_SECURE_SECRET` | VNPay merchant credentials; keep the secret only in `backend/.env` |
+| `VNPAY_HASH_ALGORITHM` | Optional signing algorithm (`SHA512` by default) |
+| `VNPAY_QUERY_IP_ADDR` | Backend IP sent with status queries; defaults to loopback for local sandbox use |
 
 Set `PUBLIC_API_URL` to an address reachable by the device (for example
 `http://10.0.2.2:3000` for Android Emulator, or your development LAN URL).
@@ -171,10 +174,21 @@ comma-separated `amenities`, optional coordinates and `radius`; sort accepts
 `distance`, `price_asc`, `price_desc`, `newest`. Radius search is executed in
 PostGIS, not in the client.
 
+### Payments
+
+- `POST /api/payment/orders` creates an authenticated VNPay QR order for a room.
+  The amount is read from the room price in PostgreSQL; clients cannot set it.
+- `GET /api/payment/orders/:txnRef/status` checks the authenticated student's
+  order against VNPay and updates it to `PAID` only after response verification.
+- The integration currently targets the VNPay sandbox and the app polls the
+  status while displaying the QR. Configure `VNPAY_TMN_CODE` and
+  `VNPAY_SECURE_SECRET` in `backend/.env`; never commit either value.
+
 ## 11. Database structure
 
 - `users`, `refresh_tokens`, `phone_verifications`
 - Rooms: `rooms`, `room_images`, `favorites`
+- Payments: `payments` (VNPay order, amount, status and transaction metadata)
 - `rooms.location` is PostGIS geography(Point,4326), maintained from latitude /
   longitude with a GiST index.
 
@@ -195,8 +209,10 @@ npx.cmd prisma migrate status
 
 ## 13. Current provider limitations
 
-The app has no chat or payment workflow. Local image storage is intended for
-development, not horizontally scaled production deployments.
+The payment workflow currently supports sandbox QR orders and status polling;
+payment history, IPN, refunds, and automatic expiration are not included. Local
+image storage is intended for development, not horizontally scaled production
+deployments.
 
 ## 14. Production recommendations
 

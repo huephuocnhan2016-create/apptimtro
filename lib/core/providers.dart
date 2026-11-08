@@ -9,6 +9,7 @@ import '../features/auth/data/user_api.dart';
 import '../features/auth/domain/user.dart';
 import '../features/chat/data/chat_api.dart';
 import '../features/chat/data/message_repository.dart';
+import '../features/payment/data/payment_api.dart';
 import '../features/rooms/data/room_api.dart';
 import '../features/rooms/data/room_repository.dart';
 import '../features/map/domain/location_service.dart';
@@ -38,10 +39,11 @@ final currentUserProvider = NotifierProvider<UserNotifier, AppUser?>(UserNotifie
 class UserNotifier extends Notifier<AppUser?> {
   @override
   AppUser? build() => null;
-  
+
   void setUser(AppUser? user) => state = user;
   void clearUser() => state = null;
 }
+
 final roomApiProvider = Provider(
   (ref) => RoomApi(ref.watch(apiClientProvider)),
 );
@@ -53,6 +55,9 @@ final locationServiceProvider = Provider((_) => LocationService());
 // ===== Firebase / chat =====
 final chatApiProvider = Provider(
   (ref) => ChatApi(ref.watch(apiClientProvider)),
+);
+final paymentApiProvider = Provider(
+  (ref) => PaymentApi(ref.watch(apiClientProvider)),
 );
 final firebaseAuthProvider = Provider((_) => FirebaseAuth.instance);
 final firestoreProvider = Provider((_) => FirebaseFirestore.instance);

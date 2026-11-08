@@ -28,6 +28,7 @@ model User {
   favorites     Favorite[]
   conversationsAsStudent  Conversation[] @relation("studentChats")
   conversationsAsLandlord Conversation[] @relation("landlordChats")
+  payments     Payment[]
 
   @@map("users")
 }
@@ -63,6 +64,7 @@ model Room {
   images          RoomImage[]
   favorites       Favorite[]
   conversations   Conversation[]
+  payments        Payment[]
 
   @@index([landlordId, createdAt])
   @@index([status, price])
@@ -110,6 +112,33 @@ model Conversation {
   @@index([studentId, createdAt])
   @@index([landlordId, createdAt])
   @@map("conversations")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  studentId     String        @map("student_id") @db.Uuid
+  roomId        String        @map("room_id") @db.Uuid
+  txnRef        String        @unique @map("txn_ref") @db.VarChar(64)
+  amount        Decimal       @db.Decimal(12, 2)
+  status        PaymentStatus @default(PENDING)
+  transactionNo String?       @map("transaction_no") @db.VarChar(64)
+  responseCode  String?       @map("response_code") @db.VarChar(8)
+  payDate       DateTime?     @map("pay_date") @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  student       User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  room          Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([roomId, status])
+  @@map("payments")
 }
 
 model RefreshToken {
