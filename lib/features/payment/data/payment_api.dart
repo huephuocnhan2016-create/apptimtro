@@ -1,0 +1,31 @@
+import '../../../core/network/api_client.dart';
+import '../domain/payment_order.dart';
+
+class PaymentApi {
+  PaymentApi(this._client);
+
+  final ApiClient _client;
+
+  Future<PaymentOrder> createOrder(String roomId) async {
+    final response = await _client.dio.post<Map<String, dynamic>>(
+      '/payment/orders',
+      data: {'roomId': roomId},
+    );
+    final data = response.data;
+    if (data == null) {
+      throw const FormatException('Invalid payment order response.');
+    }
+    return PaymentOrder.fromJson(data);
+  }
+
+  Future<String> status(String txnRef) async {
+    final response = await _client.dio.get<Map<String, dynamic>>(
+      '/payment/orders/$txnRef/status',
+    );
+    final status = response.data?['status'];
+    if (status is! String) {
+      throw const FormatException('Invalid payment status response.');
+    }
+    return status;
+  }
+}

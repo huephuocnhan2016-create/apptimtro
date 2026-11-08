@@ -239,7 +239,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     label: Text(_favorite ? 'Đã yêu thích' : 'Yêu thích'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => context.push('/payment'),
+                    onPressed: () => context.push('/payment', extra: room),
                     icon: const Icon(Icons.credit_card),
                     label: const Text('Thanh toán'),
                   ),
