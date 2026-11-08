@@ -128,7 +128,20 @@ final appRouter = GoRouter(
         return ChatScreen(room: room);
       },
     ),
-    GoRoute(path: '/payment', builder: (_, _) => const PaymentScreen()),
+    GoRoute(
+      path: '/payment',
+      builder: (_, state) {
+        final room = state.extra;
+        if (room is! Room) {
+          return const Scaffold(
+            body: Center(
+              child: Text('Không xác định được phòng để thanh toán.'),
+            ),
+          );
+        }
+        return PaymentScreen(room: room);
+      },
+    ),
     GoRoute(
       path: '/landlord',
       builder: (_, _) => const LandlordDashboardScreen(),

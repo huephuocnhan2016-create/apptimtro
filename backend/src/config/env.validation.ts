@@ -26,4 +26,8 @@ export const environmentSchema = Joi.object({
   FIREBASE_PROJECT_ID: Joi.string().required(),
   FIREBASE_CLIENT_EMAIL: Joi.string().required(),
   FIREBASE_PRIVATE_KEY: Joi.string().required(),
+  VNPAY_TMN_CODE: Joi.string().required(),
+  VNPAY_SECURE_SECRET: Joi.string().required(),
+  VNPAY_HASH_ALGORITHM: Joi.string().valid('SHA512', 'SHA256').default('SHA512'),
+  VNPAY_QUERY_IP_ADDR: Joi.string().ip().default('127.0.0.1'),
 });
