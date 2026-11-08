@@ -1,23 +1,45 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { HashAlgorithm, VNPay, dateFormat, parseDate } from 'vnpay';
+import { HashAlgorithm, VNPay, dateFormat } from 'vnpay';
 
 @Injectable()
 export class VnpayService {
-  private readonly client: VNPay;
+  private cachedClient?: VNPay;
   private readonly queryIp: string;
 
-  constructor(config: ConfigService) {
-    this.queryIp = config.getOrThrow<string>('VNPAY_QUERY_IP_ADDR');
-    this.client = new VNPay({
-      tmnCode: config.getOrThrow<string>('VNPAY_TMN_CODE'),
-      secureSecret: config.getOrThrow<string>('VNPAY_SECURE_SECRET'),
+  constructor(private readonly config: ConfigService) {
+    this.queryIp =
+      this.config.get<string>('VNPAY_QUERY_IP_ADDR') ?? '127.0.0.1';
+  }
+
+  // Built on first use so a machine without merchant credentials still boots.
+  private get client(): VNPay {
+    if (this.cachedClient) {
+      return this.cachedClient;
+    }
+    const tmnCode = this.config.get<string>('VNPAY_TMN_CODE');
+    const secureSecret = this.config.get<string>('VNPAY_SECURE_SECRET');
+    if (!tmnCode || !secureSecret) {
+      throw new ServiceUnavailableException(
+        'VNPay merchant credentials are not configured.',
+      );
+    }
+    this.cachedClient = new VNPay({
+      tmnCode,
+      secureSecret,
       vnpayHost: 'https://sandbox.vnpayment.vn',
       testMode: true,
-      hashAlgorithm: config.getOrThrow<HashAlgorithm>('VNPAY_HASH_ALGORITHM'),
+      hashAlgorithm:
+        this.config.get<HashAlgorithm>('VNPAY_HASH_ALGORITHM') ??
+        HashAlgorithm.SHA512,
       enableLog: false,
     });
+    return this.cachedClient;
   }
 
   async createQr(input: {
@@ -62,6 +84,20 @@ export class VnpayService {
   }
 
   parsePaymentDate(value: string | number): Date {
-    return parseDate(value, 'gmt7');
+    const digits = String(value);
+    if (!/^\d{14}$/.test(digits)) {
+      throw new BadGatewayException('VNPay returned an invalid payment date.');
+    }
+    // vnp_PayDate is wall-clock GMT+7, so the instant is seven hours earlier.
+    return new Date(
+      Date.UTC(
+        Number(digits.slice(0, 4)),
+        Number(digits.slice(4, 6)) - 1,
+        Number(digits.slice(6, 8)),
+        Number(digits.slice(8, 10)) - 7,
+        Number(digits.slice(10, 12)),
+        Number(digits.slice(12, 14)),
+      ),
+    );
   }
 }
