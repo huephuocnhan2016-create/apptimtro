@@ -86,9 +86,6 @@ export class PaymentService {
         throw new BadGatewayException('VNPay response is missing payment data.');
       }
       const payDate = this.vnpay.parsePaymentDate(result.vnp_PayDate);
-      if (Number.isNaN(payDate.getTime())) {
-        throw new BadGatewayException('VNPay returned an invalid payment date.');
-      }
       await this.prisma.payment.updateMany({
         where: { id: payment.id, status: PaymentStatus.PENDING },
         data: {
