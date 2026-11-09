@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../rooms/domain/room.dart';
 import '../domain/momo_result_codes.dart';
 import '../domain/payment_order.dart';
@@ -29,14 +30,6 @@ class PaymentScreen extends ConsumerStatefulWidget {
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen>
     with WidgetsBindingObserver {
-  static const _background = Color(0xFFF2F5FB);
-  static const _brand = Color(0xFF1A5CFF);
-  static const _momoBrand = Color(0xFFD1001B);
-  static const _ink = Color(0xFF0F172A);
-  static const _muted = Color(0xFF64748B);
-  static const _success = Color(0xFF16A34A);
-  static const _failure = Color(0xFFDC2626);
-
   PaymentOrder? _order;
   PaymentResult? _result;
   Timer? _timer;
@@ -85,7 +78,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   static String _portalDisplayName(String gateway) =>
       gateway == 'MOMO' ? 'MoMo' : 'VNPay';
 
-  Color get _portalBrand => _isMomo ? _momoBrand : _brand;
+  Color get _portalBrand => _isMomo ? AppColors.momo : AppColors.brand;
 
   @override
   void dispose() {
@@ -295,7 +288,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _background,
+    backgroundColor: AppColors.surfaceAlt,
     body: SafeArea(
       child: ListView(
         padding: const EdgeInsets.only(bottom: 32),
@@ -329,7 +322,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: _failure, fontSize: 13),
+                      style: const TextStyle(color: AppColors.failure, fontSize: 13),
                     ),
                   ],
                   if (_result != null) ...[
@@ -369,7 +362,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               if (mounted) context.go('/splash');
             }
           },
-          icon: const Icon(Icons.chevron_left, color: _ink),
+          icon: const Icon(Icons.chevron_left, color: AppColors.ink),
         ),
         _BrandMark(
           label: _isMomo ? 'M' : 'VN',
@@ -383,7 +376,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               Text(
                 _portalLabel,
                 style: const TextStyle(
-                  color: _ink,
+                  color: AppColors.ink,
                   fontWeight: FontWeight.w800,
                   fontSize: 17,
                   height: 1.1,
@@ -392,7 +385,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               const Text(
                 'THANH TOÁN AN TOÀN',
                 style: TextStyle(
-                  color: _muted,
+                  color: AppColors.muted,
                   fontSize: 10,
                   letterSpacing: 0.6,
                 ),
@@ -404,8 +397,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         if (_isSandbox)
           const _Pill(
             label: 'SANDBOX',
-            background: Color(0xFFFEF3C7),
-            foreground: Color(0xFF92400E),
+            background: AppColors.warningSoft,
+            foreground: AppColors.warningInk,
           ),
       ],
     ),
@@ -429,8 +422,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: _isMomo
-            ? const [Color(0xFFD1001B), Color(0xFF9E0014)]
-            : const [Color(0xFF1A5CFF), Color(0xFF0B3FBF)],
+            ? const [AppColors.momo, AppColors.momoDark]
+            : const [AppColors.brand, AppColors.brandDark],
       ),
     ),
     child: Column(
@@ -438,7 +431,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       children: [
         const _Pill(
           label: 'CÔNG THANH TOÁN TRỰC TUYẾN',
-          background: Color(0x33FFFFFF),
+          background: AppColors.onBrandOverlay,
           foreground: Colors.white,
         ),
         const SizedBox(height: 14),
@@ -454,7 +447,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         const SizedBox(height: 8),
         Text(
           'Giao dịch của bạn được bảo vệ bởi $_portalName.',
-          style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
+          style: const TextStyle(color: AppColors.onBrandMuted, fontSize: 13),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -478,7 +471,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_error != null)
-          Text(_error!, style: const TextStyle(color: _failure, fontSize: 13)),
+          Text(_error!, style: const TextStyle(color: AppColors.failure, fontSize: 13)),
         const SizedBox(height: 14),
         FilledButton(onPressed: _createOrder, child: const Text('Thử lại')),
         const SizedBox(height: 8),
@@ -499,7 +492,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         _GatewayOption(
           value: 'VNPAY',
           selected: _gateway == 'VNPAY',
-          brand: _brand,
+          brand: AppColors.brand,
           mark: 'VN',
           name: 'VNPay',
           detail: 'Chuyển khoản ngân hàng, ví VNPay, thẻ nội địa',
@@ -509,7 +502,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         _GatewayOption(
           value: 'MOMO',
           selected: _gateway == 'MOMO',
-          brand: _momoBrand,
+          brand: AppColors.momo,
           mark: 'M',
           name: 'MoMo',
           detail: 'Ví MoMo, QR MoMo, thẻ quốc tế',
@@ -539,7 +532,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     child: TextButton.icon(
       onPressed: _chooseAnotherGateway,
       style: TextButton.styleFrom(
-        foregroundColor: _muted,
+        foregroundColor: AppColors.muted,
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
       icon: const Icon(Icons.swap_horiz, size: 18),
@@ -565,7 +558,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFEFF4FF),
+            color: AppColors.brandSoft,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -576,13 +569,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                   children: [
                     const Text(
                       'Phương thức thanh toán',
-                      style: TextStyle(color: _muted, fontSize: 12),
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Cổng thanh toán $_portalName',
                       style: const TextStyle(
-                        color: _ink,
+                        color: AppColors.ink,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -605,7 +598,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             child: TextButton.icon(
               onPressed: _showResultCodes,
               style: TextButton.styleFrom(
-                foregroundColor: _momoBrand,
+                foregroundColor: AppColors.momo,
                 padding: EdgeInsets.zero,
               ),
               icon: const Icon(Icons.help_outline, size: 18),
@@ -614,7 +607,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           ),
         Text(
           'Phòng: ${widget.room!.title}',
-          style: const TextStyle(color: _muted, fontSize: 12),
+          style: const TextStyle(color: AppColors.muted, fontSize: 12),
         ),
       ],
     ),
@@ -625,7 +618,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: Colors.white,
-      border: Border.all(color: const Color(0xFFE2E8F0)),
+      border: Border.all(color: AppColors.border),
       borderRadius: BorderRadius.circular(12),
     ),
     child: Column(
@@ -636,13 +629,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           errorBuilder: (context, error, stackTrace) => const Icon(
             Icons.qr_code_2,
             size: 96,
-            color: _muted,
+            color: AppColors.muted,
           ),
         ),
         const SizedBox(height: 8),
         const Text(
           'Quét mã bằng ứng dụng MoMo để thanh toán',
-          style: TextStyle(color: _muted, fontSize: 12),
+          style: TextStyle(color: AppColors.muted, fontSize: 12),
         ),
       ],
     ),
@@ -658,12 +651,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         children: [
           const Text(
             'Mã kết quả MoMo',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _ink),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.ink),
           ),
           const SizedBox(height: 4),
           const Text(
             'MoMo trả về mã này trong thông báo kết quả.',
-            style: TextStyle(color: _muted, fontSize: 12),
+            style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
           const SizedBox(height: 14),
           for (final entry in kMomoResultCodes.entries)
@@ -678,14 +671,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                       entry.key,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: _momoBrand,
+                        color: AppColors.momo,
                       ),
                     ),
                   ),
                   Expanded(
                     child: Text(
                       entry.value,
-                      style: const TextStyle(fontSize: 13, color: _ink),
+                      style: const TextStyle(fontSize: 13, color: AppColors.ink),
                     ),
                   ),
                 ],
@@ -710,7 +703,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         const SizedBox(height: 12),
         Text(
           'Hoàn tất thanh toán rồi? Kết quả bên dưới cập nhật từ máy chủ.',
-          style: const TextStyle(color: _muted, fontSize: 12),
+          style: const TextStyle(color: AppColors.muted, fontSize: 12),
         ),
       ],
     ),
@@ -741,8 +734,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _cancelButton() => OutlinedButton.icon(
     onPressed: _cancelling ? null : _cancelDeposit,
     style: OutlinedButton.styleFrom(
-      foregroundColor: _failure,
-      side: const BorderSide(color: _failure, width: 1),
+      foregroundColor: AppColors.failure,
+      side: const BorderSide(color: AppColors.failure, width: 1),
       padding: const EdgeInsets.symmetric(vertical: 14),
       textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -753,7 +746,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: _failure,
+              color: AppColors.failure,
             ),
           )
         : const Icon(Icons.close),
@@ -763,8 +756,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _resultCard(PaymentResult result) {
     final settled = result.isSettled;
     final color = settled
-        ? (result.status == 'PAID' ? _success : _failure)
-        : _muted;
+        ? (result.status == 'PAID' ? AppColors.success : AppColors.failure)
+        : AppColors.muted;
     return _Card(
       title: 'Trạng thái giao dịch',
       trailing: Icon(
@@ -797,8 +790,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               if (result.responseCode != null)
                 _Pill(
                   label: 'Mã ${result.responseCode}',
-                  background: const Color(0xFFF1F5F9),
-                  foreground: _ink,
+                  background: AppColors.neutralSoft,
+                  foreground: AppColors.ink,
                 ),
             ],
           ),
@@ -828,19 +821,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _pendingNote() => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFFBE6),
+      color: AppColors.warningSurface,
       borderRadius: BorderRadius.circular(12),
     ),
     child: const Row(
       children: [
-        Icon(Icons.info_outline, color: Color(0xFFB45309), size: 18),
+        Icon(Icons.info_outline, color: AppColors.warningIcon, size: 18),
         SizedBox(width: 10),
         Expanded(
           child: Text(
             'Đã mở cổng thanh toán? Quay lại ứng dụng để cập nhật trạng thái. '
             'Giao dịch chưa hoàn tất sẽ tự động kiểm tra lại.',
             style: TextStyle(
-              color: Color(0xFF92400E),
+              color: AppColors.warningInk,
               fontSize: 12,
               height: 1.4,
             ),
@@ -853,13 +846,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _serverSignedNote() => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Icon(Icons.shield_outlined, color: _muted, size: 16),
+      const Icon(Icons.shield_outlined, color: AppColors.muted, size: 16),
       const SizedBox(width: 8),
       Expanded(
         child: Text(
           'Ứng dụng không chứa khóa bí mật. Đường dẫn thanh toán được máy chủ '
           'ký HMAC-${_isMomo ? 'SHA256' : 'SHA512'} và trả về cho app.',
-          style: const TextStyle(color: _muted, fontSize: 11, height: 1.4),
+          style: const TextStyle(color: AppColors.muted, fontSize: 11, height: 1.4),
         ),
       ),
     ],
@@ -873,10 +866,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   }
 
   static Color _stateBackground(PaymentResult result) {
-    if (!result.isSettled) return const Color(0xFFF1F5F9);
+    if (!result.isSettled) return AppColors.neutralSoft;
     return result.status == 'PAID'
-        ? const Color(0xFFECFDF5)
-        : const Color(0xFFFEE2E2);
+        ? AppColors.successSoft
+        : AppColors.failureSoft;
   }
 
   Widget _debugCard() => _Card(
@@ -891,7 +884,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             child: Text(
               line,
               style: const TextStyle(
-                color: _muted,
+                color: AppColors.muted,
                 fontSize: 12,
                 fontFamily: 'monospace',
               ),
@@ -968,9 +961,9 @@ class _GatewayOption extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFEFF4FF) : Colors.white,
+        color: selected ? AppColors.brandSoft : Colors.white,
         border: Border.all(
-          color: selected ? brand : const Color(0xFFE2E8F0),
+          color: selected ? brand : AppColors.border,
           width: selected ? 1.5 : 1,
         ),
         borderRadius: BorderRadius.circular(12),
@@ -981,7 +974,7 @@ class _GatewayOption extends StatelessWidget {
             selected
                 ? Icons.radio_button_checked
                 : Icons.radio_button_unchecked,
-            color: selected ? brand : const Color(0xFF94A3B8),
+            color: selected ? brand : AppColors.subtle,
             size: 22,
           ),
           const SizedBox(width: 12),
@@ -994,7 +987,7 @@ class _GatewayOption extends StatelessWidget {
                 Text(
                   name,
                   style: const TextStyle(
-                    color: Color(0xFF0F172A),
+                    color: AppColors.ink,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1003,7 +996,7 @@ class _GatewayOption extends StatelessWidget {
                 Text(
                   detail,
                   style: const TextStyle(
-                    color: Color(0xFF64748B),
+                    color: AppColors.muted,
                     fontSize: 12,
                     height: 1.35,
                   ),
@@ -1057,7 +1050,7 @@ class _HeroBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
     decoration: BoxDecoration(
-      color: const Color(0x22000000),
+      color: AppColors.scrim,
       borderRadius: BorderRadius.circular(999),
     ),
     child: Row(
@@ -1092,7 +1085,7 @@ class _Card extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-          color: const Color(0x0F0F172A),
+          color: AppColors.shadow,
           blurRadius: 16,
           offset: const Offset(0, 4),
         ),
@@ -1107,7 +1100,7 @@ class _Card extends StatelessWidget {
               child: Text(
                 title,
                 style: const TextStyle(
-                  color: _cardMuted,
+                  color: AppColors.muted,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1120,7 +1113,7 @@ class _Card extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             subtitle!,
-            style: const TextStyle(color: _cardMuted, fontSize: 12),
+            style: const TextStyle(color: AppColors.muted, fontSize: 12),
           ),
         ],
         const SizedBox(height: 14),
@@ -1129,8 +1122,6 @@ class _Card extends StatelessWidget {
     ),
   );
 }
-
-const _cardMuted = Color(0xFF64748B);
 
 class _Field extends StatelessWidget {
   const _Field({
@@ -1147,20 +1138,20 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(
-      border: Border.all(color: const Color(0xFFE2E8F0)),
+      border: Border.all(color: AppColors.border),
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: _cardMuted, fontSize: 12)),
+        Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             value,
             textAlign: TextAlign.right,
             style: TextStyle(
-              color: const Color(0xFF0F172A),
+              color: AppColors.ink,
               fontSize: emphasize ? 17 : 13,
               fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
             ),
@@ -1187,7 +1178,7 @@ class _DetailRow extends StatelessWidget {
           flex: 2,
           child: Text(
             label,
-            style: const TextStyle(color: _cardMuted, fontSize: 12),
+            style: const TextStyle(color: AppColors.muted, fontSize: 12),
           ),
         ),
         const SizedBox(width: 12),
@@ -1197,7 +1188,7 @@ class _DetailRow extends StatelessWidget {
             value,
             textAlign: TextAlign.right,
             style: const TextStyle(
-              color: Color(0xFF0F172A),
+              color: AppColors.ink,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
