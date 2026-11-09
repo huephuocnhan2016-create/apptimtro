@@ -208,6 +208,20 @@ PostGIS, not in the client.
   listings stay in search results and favourites so students can see they are
   taken, but no further deposit is accepted until the landlord raises
   availability again.
+- `GET /api/payment/deposits` returns the student's own `PAID` orders, newest
+  first, each with the room's id, title, address, price, deposit and first
+  image. The app shows it under **Cá nhân → Phòng đã đặt cọc**
+  (`/deposits`), and an entry opens `/rooms/:id`. Pending checkouts are not
+  listed because they have not booked a room yet. Every row also carries a
+  **Hủy cọc** button that asks for confirmation, calls
+  `POST /api/payment/orders/:txnRef/cancel` and reloads the list, so a deposit
+  made from another device can still be dropped here.
+- A student holds at most one deposit per listing. `POST /api/payment/orders`
+  answers `409` when they already have a `PAID` order on that room, and
+  `GET /api/rooms/:id` reports it as `hasDeposit` so the app can disable the
+  Đặt cọc button instead of sending them to a gate that will refuse them. Two
+  checkouts opened before the first one paid still cannot both book: the second
+  turns `FAILED` with `responseCode` `97` and leaves `availableRooms` alone.
 - Without merchant credentials a non-production backend hands the app a
   stand-in portal page, `GET /api/payment/dev/checkout/:txnRef`, styled like the
   VNPay page. Its Xác nhận / Hủy links close the order through

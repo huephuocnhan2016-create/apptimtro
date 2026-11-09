@@ -95,3 +95,49 @@ class PaymentResult {
     message: message,
   );
 }
+
+/// A deposit the student is holding, with just enough of the room to show it
+/// in the profile list and open its detail page.
+class RoomDeposit {
+  const RoomDeposit({
+    required this.txnRef,
+    required this.amount,
+    required this.payDate,
+    required this.roomId,
+    required this.roomTitle,
+    required this.roomAddress,
+    this.roomImage,
+  });
+
+  final String txnRef;
+  final num amount;
+  final DateTime? payDate;
+  final String roomId;
+  final String roomTitle;
+  final String roomAddress;
+  final String? roomImage;
+
+  factory RoomDeposit.fromJson(Map<String, dynamic> json) {
+    final txnRef = json['txnRef'];
+    final amount = json['amount'];
+    final room = json['room'];
+    if (txnRef is! String || amount is! num || room is! Map<String, dynamic>) {
+      throw const FormatException('Invalid deposit list response.');
+    }
+    final roomId = room['id'];
+    final title = room['title'];
+    final address = room['address'];
+    if (roomId is! String || title is! String || address is! String) {
+      throw const FormatException('Invalid deposit room response.');
+    }
+    return RoomDeposit(
+      txnRef: txnRef,
+      amount: amount,
+      payDate: DateTime.tryParse(json['payDate'] as String? ?? ''),
+      roomId: roomId,
+      roomTitle: title,
+      roomAddress: address,
+      roomImage: room['image'] as String?,
+    );
+  }
+}

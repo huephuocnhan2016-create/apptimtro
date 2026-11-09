@@ -24,6 +24,7 @@ class Room {
     this.landlordAvatar,
     this.landlordPhone,
     this.isFavorite = false,
+    this.hasDeposit = false,
   });
 
   final String id;
@@ -50,6 +51,7 @@ class Room {
   final String? landlordAvatar;
   final String? landlordPhone;
   final bool isFavorite;
+  final bool hasDeposit;
 
   factory Room.fromJson(Map<String, dynamic> json) {
     final landlord = json['landlord'];
@@ -97,6 +99,7 @@ class Room {
           ? landlord['phone'] as String?
           : null,
       isFavorite: json['isFavorite'] as bool? ?? false,
+      hasDeposit: json['hasDeposit'] as bool? ?? false,
     );
   }
 

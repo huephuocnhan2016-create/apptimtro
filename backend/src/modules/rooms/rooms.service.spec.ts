@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { RoomStatus, User, UserRole } from '@prisma/client';
+import { PaymentStatus, RoomStatus, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { GeocodingService } from './geocoding.service';
@@ -45,6 +45,7 @@ describe('RoomsService', () => {
       aggregate: jest.fn(),
     },
     roomImage: { create: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
+    payment: { findFirst: jest.fn() },
     favorite: {
       upsert: jest.fn(),
       deleteMany: jest.fn(),
@@ -281,5 +282,20 @@ describe('RoomsService', () => {
     expect(prisma.favorite.upsert.mock.calls[0][0].where).toEqual({
       userId_roomId: { userId: student.id, roomId: room.id },
     });
+  });
+
+  it('tells a student which room they already hold a deposit on', async () => {
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.findFirst.mockResolvedValue({ id: 'paid-order' });
+    const student = { ...landlord, role: UserRole.STUDENT } as User;
+
+    const result = await service.getOne(room.id, student);
+
+    expect(prisma.payment.findFirst).toHaveBeenCalledWith({
+      where: { studentId: student.id, roomId: room.id, status: PaymentStatus.PAID },
+      select: { id: true },
+    });
+    expect(result.hasDeposit).toBe(true);
+    expect(result.isFavorite).toBe(false);
   });
 });

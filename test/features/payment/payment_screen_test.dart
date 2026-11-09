@@ -46,6 +46,9 @@ class _FakePaymentApi implements PaymentApi {
     payDate: null,
     message: 'Giao dịch không thành công do: Khách hàng hủy giao dịch',
   );
+
+  @override
+  Future<List<RoomDeposit>> deposits() async => throw UnimplementedError();
 }
 
 Room get _room => const Room(

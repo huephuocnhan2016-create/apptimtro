@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, RoomStatus, User, UserRole } from '@prisma/client';
+import { PaymentStatus, Prisma, RoomStatus, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AvailabilityDto } from './dto/availability.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
@@ -77,7 +77,15 @@ export class RoomsService {
           select: { id: true },
         }))
       : false;
-    return { ...this.serialize(room), isFavorite };
+    // One deposit per student per room, so the app can close the door before
+    // it sends the shopper to the gate.
+    const hasDeposit = user
+      ? Boolean(await this.prisma.payment.findFirst({
+          where: { studentId: user.id, roomId: id, status: PaymentStatus.PAID },
+          select: { id: true },
+        }))
+      : false;
+    return { ...this.serialize(room), isFavorite, hasDeposit };
   }
 
   async update(user: User, id: string, dto: UpdateRoomDto) {

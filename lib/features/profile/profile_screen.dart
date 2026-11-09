@@ -39,6 +39,12 @@ class ProfileScreen extends ConsumerWidget {
             title: const Text('Vai trò'),
             subtitle: Text(user?.role.name.toUpperCase() ?? 'STUDENT'),
           ),
+          if (user?.role == UserRole.student)
+            ListTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('Phòng đã đặt cọc'),
+              onTap: () => context.push('/deposits'),
+            ),
           if (user?.role == UserRole.landlord)
             ListTile(
               leading: const Icon(Icons.home_work_outlined),

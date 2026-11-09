@@ -9,6 +9,7 @@ import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/map/presentation/map_screen.dart';
+import '../../features/payment/presentation/deposit_list_screen.dart';
 import '../../features/payment/presentation/payment_screen.dart';
 import '../../features/rooms/domain/room.dart';
 import '../../features/rooms/presentation/room_detail_screen.dart';
@@ -153,6 +154,10 @@ final appRouter = GoRouter(
         }
         return PaymentScreen(room: room);
       },
+    ),
+    GoRoute(
+      path: '/deposits',
+      builder: (_, _) => const DepositListScreen(),
     ),
     GoRoute(
       path: '/landlord',
