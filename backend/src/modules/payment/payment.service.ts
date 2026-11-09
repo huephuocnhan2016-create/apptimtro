@@ -85,6 +85,31 @@ export class PaymentService {
     }
   }
 
+  // A student pulling out of a deposit. Money already handed to VNPay can only
+  // come back through the refund API, so with real credentials a paid deposit
+  // stays paid and the landlord settles it offline.
+  async cancel(user: User, txnRef: string) {
+    if (user.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('Only students can cancel payment orders.');
+    }
+    const payment = await this.prisma.payment.findFirst({
+      where: { txnRef, studentId: user.id },
+    });
+    if (!payment) throw new NotFoundException('Payment order not found.');
+    if (payment.status === PaymentStatus.PAID && !this.vnpay.devModeEnabled) {
+      throw new ConflictException(
+        'Tiền cọc đã vào VNPAY, hoàn tiền cần cổng refund của VNPAY.',
+      );
+    }
+    if (
+      payment.status === PaymentStatus.PENDING ||
+      payment.status === PaymentStatus.PAID
+    ) {
+      await this.markCancelled(payment, payment.status);
+    }
+    return this.reload(txnRef);
+  }
+
   async devSucceed(user: User, txnRef: string) {
     if (!this.vnpay.devModeEnabled) {
       throw new NotFoundException('Payment order not found.');
@@ -212,8 +237,34 @@ export class PaymentService {
     });
   }
 
-  async status(user: User, txnRef: string) {
-    const payment = await this.prisma.payment.findFirst({
+  // Cancelling a paid deposit gives the room back to the listing, and a listing
+  // that reads as deposited stops reading that way.
+  private async markCancelled(
+    payment: { id: string; roomId: string },
+    from: PaymentStatus,
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      const flipped = await tx.payment.updateMany({
+        where: { id: payment.id, status: from },
+        data: { status: PaymentStatus.CANCELLED, responseCode: '24' },
+      });
+      if (flipped.count === 0 || from !== PaymentStatus.PAID) return;
+      await tx.room.updateMany({
+        where: { id: payment.roomId },
+        data: { availableRooms: { increment: 1 } },
+      });
+      await tx.room.updateMany({
+        where: {
+          id: payment.roomId,
+          status: RoomStatus.DEPOSITED,
+          availableRooms: { gt: 0 },
+        },
+        data: { status: RoomStatus.AVAILABLE },
+      });
+    });
+  }
+
+  async status(user: User, txnRef: string) {    const payment = await this.prisma.payment.findFirst({
       where: { txnRef, studentId: user.id },
     });
     if (!payment) throw new NotFoundException('Payment order not found.');

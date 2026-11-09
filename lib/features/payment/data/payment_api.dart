@@ -28,4 +28,15 @@ class PaymentApi {
     }
     return PaymentResult.fromJson(data);
   }
+
+  Future<PaymentResult> cancel(String txnRef) async {
+    final response = await _client.dio.post<Map<String, dynamic>>(
+      '/payment/orders/$txnRef/cancel',
+    );
+    final data = response.data;
+    if (data == null) {
+      throw const FormatException('Invalid payment cancel response.');
+    }
+    return PaymentResult.fromJson(data);
+  }
 }

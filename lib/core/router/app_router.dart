@@ -19,6 +19,16 @@ import '../../features/favorites/presentation/favorites_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
+  redirect: (context, state) {
+    // The portal's "Về ứng dụng" link carries only a transaction reference;
+    // go_router has no custom-scheme support, so re-read that order instead of
+    // dumping the shopper back on the splash screen.
+    if (state.uri.scheme == 'trotot') {
+      final txnRef = state.uri.queryParameters['txnRef'];
+      return txnRef == null ? '/splash' : '/payment?txnRef=$txnRef';
+    }
+    return null;
+  },
   routes: [
     GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
     GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
@@ -131,6 +141,8 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/payment',
       builder: (_, state) {
+        final txnRef = state.uri.queryParameters['txnRef'];
+        if (txnRef != null) return PaymentScreen(txnRef: txnRef);
         final room = state.extra;
         if (room is! Room) {
           return const Scaffold(

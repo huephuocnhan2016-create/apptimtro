@@ -181,17 +181,28 @@ PostGIS, not in the client.
   `amount` and `orderInfo`. The amount is read from the room deposit in
   PostgreSQL; clients cannot set it. A listing that is already `DEPOSITED` or
   has no free room left answers `409`.
-- The app opens `payUrl` in an in-app browser tab. VNPay then redirects to
-  `GET /api/payment/vnpay/return`, a public endpoint that re-checks the
-  checksum and renders the result page. The app has no deep link back from that
-  page: it refreshes the order when it returns to the foreground and keeps
-  polling every 3 seconds. Configure `VNPAY_TMN_CODE`, `VNPAY_SECURE_SECRET`
-  and a device-reachable `PUBLIC_API_URL` (the redirect target) in
-  `backend/.env`; never commit either credential.
+- The app opens `payUrl` in the device browser (a Chrome custom tab refuses
+  `intent://` links to another package, so the hand-back button would be dead).
+  VNPay then redirects to `GET /api/payment/vnpay/return`, a public endpoint
+  that re-checks the checksum and renders the result page. That page offers a
+  **Về ứng dụng** button, a `trotot://payment-return?txnRef=…` link the app's
+  manifest claims; the router turns it into `/payment?txnRef=…`, which re-reads
+  the order and shows the result screen, so the shopper lands on their deposit
+  instead of the splash screen. Returning to the foreground also refreshes the
+  order, and the screen keeps polling every 3 seconds while it is pending.
+  Configure `VNPAY_TMN_CODE`, `VNPAY_SECURE_SECRET` and a device-reachable
+  `PUBLIC_API_URL` (the redirect target) in `backend/.env`; never commit either
+  credential.
 - `GET /api/payment/orders/:txnRef/status` verifies the order against VNPay
   (`queryDr`) and returns the full transaction view — status, amount, bank,
   `transactionNo`, `responseCode`, `payDate` and a Vietnamese message. It moves
   the order to `PAID` only after a verified `00` response.
+- `POST /api/payment/orders/:txnRef/cancel` lets the order's own student drop
+  the deposit: the order turns `CANCELLED` with `responseCode` `24`, and a
+  deposit that had already been paid gives its room back (`availableRooms`
+  increments, and a `DEPOSITED` listing returns to `AVAILABLE`). With real
+  merchant credentials a `PAID` order answers `409` instead — getting that
+  money back needs the VNPay refund API, which this build does not call.
 - A `PAID` deposit books one of the listing's rooms: `availableRooms` drops by
   one, and when it reaches zero the listing turns `DEPOSITED`. Deposited
   listings stay in search results and favourites so students can see they are
@@ -233,10 +244,12 @@ npx.cmd prisma migrate status
 
 The deposit workflow uses the hosted VNPay portal page and status polling;
 payment history, IPN, refunds, and automatic expiration are not included. There
-is no deep link from the portal result page back into the app, so the student
-has to return to it by hand. A cancelled or refunded deposit does not give the
-booked room back. Local image storage is intended for development, not
-horizontally scaled production deployments.
+is no deep link from the portal result page back into the app — its **Về ứng
+dụng** button only asks the browser to raise the app again, and a browser that
+blocks that intent leaves the student returning by hand. Cancelling a deposit
+gives its room back, but a deposit VNPay has already taken cannot be cancelled
+until the refund API is wired in. Local image storage is intended for
+development, not horizontally scaled production deployments.
 
 ## 14. Production recommendations
 

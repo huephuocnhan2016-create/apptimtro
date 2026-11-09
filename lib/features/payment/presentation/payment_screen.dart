@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -11,9 +12,14 @@ import '../../rooms/domain/room.dart';
 import '../domain/payment_order.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
-  const PaymentScreen({required this.room, super.key});
+  const PaymentScreen({this.room, this.txnRef, super.key})
+    : assert(room != null || txnRef != null);
 
-  final Room room;
+  final Room? room;
+
+  /// Set instead of [room] when the payment portal hands the app back a
+  /// transaction to re-read, because the browser link carries no room.
+  final String? txnRef;
 
   @override
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
@@ -35,12 +41,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   bool _loading = true;
   bool _checkingStatus = false;
   bool _launching = false;
+  bool _cancelling = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _createOrder();
+    if (widget.txnRef != null) {
+      _readExistingOrder();
+    } else {
+      _createOrder();
+    }
   }
 
   @override
@@ -68,7 +79,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     try {
       final order = await ref
           .read(paymentApiProvider)
-          .createOrder(widget.room.id);
+          .createOrder(widget.room!.id);
       if (!mounted) return;
       setState(() {
         _order = order;
@@ -80,6 +91,36 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       setState(() {
         _loading = false;
         _error = 'Không tạo được yêu cầu đặt cọc: ${apiErrorMessage(error)}';
+      });
+    }
+  }
+
+  String? get _activeTxnRef => _order?.txnRef ?? widget.txnRef;
+
+  // Coming back from the portal there is no local order, only the reference the
+  // link carried, so the screen is rebuilt from the server's view of it.
+  Future<void> _readExistingOrder() async {
+    _timer?.cancel();
+    setState(() {
+      _loading = true;
+      _error = null;
+      _result = null;
+    });
+    try {
+      final result = await ref
+          .read(paymentApiProvider)
+          .status(widget.txnRef!);
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+      if (!result.isSettled) _startPolling();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Không đọc được đặt cọc: ${apiErrorMessage(error)}';
       });
     }
   }
@@ -97,7 +138,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     try {
       opened = await launchUrl(
         Uri.parse(order.payUrl),
-        mode: LaunchMode.inAppBrowserView,
+        // A Chrome custom tab refuses intent:// links to another package, so
+        // the portal's "Về ứng dụng" button only lands in a real browser tab.
+        mode: LaunchMode.externalApplication,
       );
     } catch (_) {
       opened = false;
@@ -110,12 +153,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   }
 
   Future<void> _checkStatus() async {
-    final order = _order;
-    if (order == null || _checkingStatus) return;
+    final txnRef = _activeTxnRef;
+    if (txnRef == null || _checkingStatus) return;
     if (_result?.isSettled ?? false) return;
     _checkingStatus = true;
     try {
-      final result = await ref.read(paymentApiProvider).status(order.txnRef);
+      final result = await ref.read(paymentApiProvider).status(txnRef);
       if (!mounted) return;
       setState(() {
         _result = result;
@@ -129,6 +172,54 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       });
     } finally {
       _checkingStatus = false;
+    }
+  }
+
+  bool get _canCancel {
+    if (_activeTxnRef == null) return false;
+    final status = _result?.status;
+    return status == null || status == 'PENDING' || status == 'PAID';
+  }
+
+  Future<void> _cancelDeposit() async {
+    final txnRef = _activeTxnRef;
+    if (txnRef == null || _cancelling) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hủy đặt cọc?'),
+        content: const Text(
+          'Phòng sẽ được mở lại cho người khác đặt cọc.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Giữ cọc'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hủy cọc'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _cancelling = true);
+    try {
+      final result = await ref.read(paymentApiProvider).cancel(txnRef);
+      if (!mounted) return;
+      _timer?.cancel();
+      setState(() {
+        _result = result;
+        _error = null;
+        _cancelling = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _cancelling = false;
+        _error = 'Không hủy được đặt cọc: ${apiErrorMessage(error)}';
+      });
     }
   }
 
@@ -152,12 +243,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                     padding: EdgeInsets.symmetric(vertical: 48),
                     child: Center(child: CircularProgressIndicator()),
                   )
-                else if (_order == null)
+                else if (_order == null && widget.txnRef == null)
                   _errorCard()
                 else ...[
-                  _infoCard(_order!),
+                  if (_order != null) _infoCard(_order!) else _referenceCard(),
                   const SizedBox(height: 16),
-                  if (_result == null || !_result!.isSettled) _payButton(),
+                  if (_order != null && (_result == null || !_result!.isSettled))
+                    _payButton(),
+                  if (_canCancel) ...[
+                    const SizedBox(height: 12),
+                    _cancelButton(),
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     Text(
@@ -191,30 +287,43 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     child: Row(
       children: [
         IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
+          // The portal hands the app a deep link, which starts this screen as
+          // the only route, so there is usually nothing underneath to pop.
+          onPressed: () async {
+            if (!mounted) return;
+            if (!await Navigator.of(context).maybePop()) {
+              if (mounted) context.go('/splash');
+            }
+          },
           icon: const Icon(Icons.chevron_left, color: _ink),
         ),
         const _BrandMark(),
         const SizedBox(width: 10),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'VNPAY',
-              style: TextStyle(
-                color: _ink,
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
-                height: 1.1,
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'VNPAY',
+                style: TextStyle(
+                  color: _ink,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
+                  height: 1.1,
+                ),
               ),
-            ),
-            Text(
-              'THANH TOÁN AN TOÀN',
-              style: TextStyle(color: _muted, fontSize: 10, letterSpacing: 0.6),
-            ),
-          ],
+              Text(
+                'THANH TOÁN AN TOÀN',
+                style: TextStyle(
+                  color: _muted,
+                  fontSize: 10,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
         ),
-        const Spacer(),
+        const SizedBox(width: 8),
         if (_isSandbox)
           const _Pill(
             label: 'SANDBOX',
@@ -241,16 +350,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         colors: [Color(0xFF1A5CFF), Color(0xFF0B3FBF)],
       ),
     ),
-    child: const Column(
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Pill(
+        const _Pill(
           label: 'CÔNG THANH TOÁN TRỰC TUYẾN',
           background: Color(0x33FFFFFF),
           foreground: Colors.white,
         ),
-        SizedBox(height: 14),
-        Text(
+        const SizedBox(height: 14),
+        const Text(
           'Thanh toán nhanh chóng,\nan tâm tuyệt đối.',
           style: TextStyle(
             color: Colors.white,
@@ -259,16 +368,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             height: 1.25,
           ),
         ),
-        SizedBox(height: 8),
-        Text(
+        const SizedBox(height: 8),
+        const Text(
           'Giao dịch của bạn được bảo vệ bởi VNPAY.',
           style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
         ),
-        SizedBox(height: 16),
-        Row(
-          children: [
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: const [
             _HeroBadge(icon: Icons.lock_outline, label: 'Bảo mật'),
-            SizedBox(width: 8),
             _HeroBadge(
               icon: Icons.verified_user_outlined,
               label: 'Xác thực giao dịch',
@@ -341,7 +451,27 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         ),
         const SizedBox(height: 12),
         Text(
-          'Phòng: ${widget.room.title}',
+          'Phòng: ${widget.room!.title}',
+          style: const TextStyle(color: _muted, fontSize: 12),
+        ),
+      ],
+    ),
+  );
+
+  // Returned from the portal with a reference but no room in hand.
+  Widget _referenceCard() => _Card(
+    title: 'Thông tin thanh toán',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Field(
+          label: 'Mã tham chiếu',
+          value: widget.txnRef!,
+          emphasize: true,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Hoàn tất thanh toán rồi? Kết quả bên dưới cập nhật từ máy chủ.',
           style: const TextStyle(color: _muted, fontSize: 12),
         ),
       ],
@@ -368,6 +498,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           )
         : const Icon(Icons.credit_card),
     label: Text(_launching ? 'Đang mở cổng thanh toán...' : 'Thanh toán ngay'),
+  );
+
+  Widget _cancelButton() => OutlinedButton.icon(
+    onPressed: _cancelling ? null : _cancelDeposit,
+    style: OutlinedButton.styleFrom(
+      foregroundColor: _failure,
+      side: const BorderSide(color: _failure, width: 1),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+    icon: _cancelling
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: _failure,
+            ),
+          )
+        : const Icon(Icons.close),
+    label: Text(_cancelling ? 'Đang hủy cọc...' : 'Hủy cọc'),
   );
 
   Widget _resultCard(PaymentResult result) {
@@ -639,20 +791,19 @@ class _Field extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(label, style: const TextStyle(color: _cardMuted, fontSize: 12)),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
-            label,
-            style: const TextStyle(color: _cardMuted, fontSize: 12),
-          ),
-        ),
-        Text(
-          value,
-          textAlign: TextAlign.right,
-          style: TextStyle(
-            color: const Color(0xFF0F172A),
-            fontSize: emphasize ? 17 : 13,
-            fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: const Color(0xFF0F172A),
+              fontSize: emphasize ? 17 : 13,
+              fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+            ),
           ),
         ),
       ],

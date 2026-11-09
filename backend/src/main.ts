@@ -12,7 +12,16 @@ import helmet from 'helmet';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        // The dev checkout page is served over plain http and links to itself;
+        // upgrading those navigations to https breaks the flow.
+        directives: { 'upgrade-insecure-requests': null },
+      },
+    }),
+  );
   app.setGlobalPrefix('api');
   app.use('/uploads', serveStatic(join(process.cwd(), 'uploads')));
   const corsOrigin = config.getOrThrow<string>('CORS_ORIGIN');

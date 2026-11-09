@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -367,6 +368,113 @@ describe('PaymentService', () => {
     expect(tx.room.updateMany).not.toHaveBeenCalled();
     expect(result.status).toBe(PaymentStatus.CANCELLED);
     expect(result.message).toBe('Mã 24');
+  });
+
+  it('cancels a pending order on the student request without touching the room', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'cancel-ref',
+        studentId: student.id,
+        amount: 3000000,
+        status: PaymentStatus.PENDING,
+        transactionNo: null,
+        responseCode: null,
+        payDate: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'cancel-ref',
+        studentId: student.id,
+        amount: 3000000,
+        status: PaymentStatus.CANCELLED,
+        transactionNo: null,
+        responseCode: '24',
+        payDate: null,
+      });
+
+    const result = await service.cancel(student, 'cancel-ref');
+
+    expect(tx.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'payment-id', status: PaymentStatus.PENDING },
+      data: { status: PaymentStatus.CANCELLED, responseCode: '24' },
+    });
+    expect(tx.room.updateMany).not.toHaveBeenCalled();
+    expect(result.status).toBe(PaymentStatus.CANCELLED);
+  });
+
+  it('gives the room back when a paid deposit is cancelled in dev mode', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'cancel-ref',
+        studentId: student.id,
+        amount: 3000000,
+        status: PaymentStatus.PAID,
+        transactionNo: 'DEV-cancel',
+        responseCode: '00',
+        payDate: new Date('2026-11-09T10:00:00.000Z'),
+      })
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'cancel-ref',
+        studentId: student.id,
+        amount: 3000000,
+        status: PaymentStatus.CANCELLED,
+        transactionNo: 'DEV-cancel',
+        responseCode: '24',
+        payDate: new Date('2026-11-09T10:00:00.000Z'),
+      });
+
+    await service.cancel(student, 'cancel-ref');
+
+    expect(tx.room.updateMany).toHaveBeenCalledWith({
+      where: { id: room.id },
+      data: { availableRooms: { increment: 1 } },
+    });
+    expect(tx.room.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: room.id,
+        status: 'DEPOSITED',
+        availableRooms: { gt: 0 },
+      },
+      data: { status: 'AVAILABLE' },
+    });
+  });
+
+  it('refuses to cancel a paid deposit once real VNPay credentials exist', async () => {
+    vnpay.devModeEnabled = false;
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-id',
+      roomId: room.id,
+      txnRef: 'cancel-ref',
+      studentId: student.id,
+      amount: 3000000,
+      status: PaymentStatus.PAID,
+      transactionNo: '999',
+      responseCode: '00',
+      payDate: new Date('2026-11-09T10:00:00.000Z'),
+    });
+
+    await expect(
+      service.cancel(student, 'cancel-ref'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.payment.updateMany).not.toHaveBeenCalled();
+    vnpay.devModeEnabled = true;
+  });
+
+  it('keeps landlords out of the cancel endpoint', async () => {
+    await expect(
+      service.cancel(
+        { id: 'landlord-id', role: UserRole.LANDLORD } as User,
+        'cancel-ref',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.payment.findFirst).not.toHaveBeenCalled();
   });
 
   it('hides the dev endpoint as soon as real credentials exist', async () => {
