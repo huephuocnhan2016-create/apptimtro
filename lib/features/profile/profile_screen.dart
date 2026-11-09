@@ -20,7 +20,7 @@ class ProfileScreen extends ConsumerWidget {
             radius: 38,
             child: Text(
               (user?.fullName?.isNotEmpty ?? false)
-                  ? user!.fullName![0].toUpperCase()
+                  ? user!.fullName!.characters.first.toUpperCase()
                   : 'T',
               style: const TextStyle(fontSize: 28),
             ),
@@ -56,36 +56,11 @@ class ProfileScreen extends ConsumerWidget {
             leading: const Icon(Icons.logout),
             title: const Text('Đăng xuất'),
             onTap: () async {
+              final users = ref.read(currentUserProvider.notifier);
               await ref.read(authRepositoryProvider).logout();
-              ref.read(currentUserProvider.notifier).state = null;
-              if (context.mounted) context.go('/welcome');
+              // Xoá user là đủ: router tự đưa về màn đăng nhập.
+              users.clearUser();
             },
-          ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 3,
-        onDestinationSelected: (index) {
-          if (index == 0) context.go('/home');
-          if (index == 1) context.go('/map');
-          if (index == 2) context.go('/favorites');
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            label: 'Trang chủ',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            label: 'Bản đồ',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.favorite_border),
-            label: 'Yêu thích',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Cá nhân',
           ),
         ],
       ),

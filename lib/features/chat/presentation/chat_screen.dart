@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/providers.dart';
 import '../../rooms/domain/room.dart';
+import '../../../shared/format.dart';
 import '../domain/message.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -98,6 +98,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  Stream<List<Message>>? _messages;
+  String? _messagesConversationId;
+
+  /// Mở stream Firestore một lần cho mỗi cuộc trò chuyện. Gọi thẳng
+  /// `messages(id)` trong build thì mỗi lần vẽ lại là một subscription mới.
+  Stream<List<Message>> _messagesFor(String conversationId) {
+    if (_messages == null || _messagesConversationId != conversationId) {
+      _messagesConversationId = conversationId;
+      _messages = ref.read(messageRepositoryProvider).messages(conversationId);
+    }
+    return _messages!;
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('Chat với ${widget.resolvedPeerName}')),
@@ -123,9 +136,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             Expanded(
               child: StreamBuilder(
-                stream: ref
-                    .read(messageRepositoryProvider)
-                    .messages(session.conversationId),
+                stream: _messagesFor(session.conversationId),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Center(
@@ -199,7 +210,7 @@ class _MessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final time = message.createdAt == null
         ? (message.pending ? 'đang gửi…' : '')
-        : DateFormat.Hm().format(message.createdAt!.toLocal());
+        : formatTimeVn(message.createdAt!);
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(

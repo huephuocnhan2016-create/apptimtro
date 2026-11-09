@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
-import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
+import '../../../shared/format.dart';
+import '../../../shared/widgets/app_network_image.dart';
+import '../../../shared/widgets/async_state_view.dart';
 import '../domain/conversation.dart';
+
+/// Danh sách cuộc trò chuyện. Trước đây future được tạo ngay trong build nên
+/// mỗi lần vẽ lại là gọi API lại; giờ chỉ tải lại khi `ref.invalidate`.
+final conversationsProvider =
+    FutureProvider.autoDispose<List<ChatConversation>>((ref) async {
+      await ref.watch(firebaseSignInProvider.future);
+      return ref.watch(messageRepositoryProvider).conversations();
+    });
 
 class ChatListScreen extends ConsumerWidget {
   const ChatListScreen({super.key});
@@ -13,35 +22,17 @@ class ChatListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(title: const Text('Cuộc trò chuyện')),
-    body: FutureBuilder(
-      future: ref.read(firebaseSignInProvider.future).then(
-        (_) => ref.read(messageRepositoryProvider).conversations(),
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'Không tải được danh sách chat: ${apiErrorMessage(snapshot.error!)}',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final conversations = snapshot.data!;
-        if (conversations.isEmpty) {
-          return const Center(
-            child: Text(
-              'Chưa có cuộc trò chuyện nào.\nVào Mục yêu thích và bấm icon chat để bắt đầu.',
-              textAlign: TextAlign.center,
-            ),
-          );
-        }
-        return ListView.separated(
+    body: AsyncStateView<List<ChatConversation>>(
+        snapshot: AsyncStateView.snapshotOf(ref.watch(conversationsProvider)),
+        errorPrefix: 'Không tải được danh sách chat',
+        onRetry: () => ref.invalidate(conversationsProvider),
+        emptyMessage:
+            'Chưa có cuộc trò chuyện nào.\nVào Mục yêu thích và bấm icon chat để bắt đầu.',
+        emptyIcon: Icons.chat_bubble_outline,
+        builder: (context, conversations) => RefreshIndicator(
+          onRefresh: () => ref.refresh(conversationsProvider.future),
+          child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(12),
           itemCount: conversations.length,
           separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -66,9 +57,7 @@ class ChatListScreen extends ConsumerWidget {
                     ),
                     if (conversation.createdAt != null)
                       Text(
-                        DateFormat(
-                          'dd/MM/yyyy HH:mm',
-                        ).format(conversation.createdAt!.toLocal()),
+                        formatDateVn(conversation.createdAt!),
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                   ],
@@ -78,8 +67,8 @@ class ChatListScreen extends ConsumerWidget {
               ),
             );
           },
-        );
-      },
+          ),
+        ),
     ),
   );
 }
@@ -100,16 +89,12 @@ class _Avatar extends StatelessWidget {
         ),
       );
     }
-    return ClipRRect(
+    return AppNetworkImage(
+      imageUrl,
+      width: 48,
+      height: 48,
       borderRadius: BorderRadius.circular(24),
-      child: Image.network(
-        imageUrl,
-        width: 48,
-        height: 48,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) =>
-            const CircleAvatar(child: Icon(Icons.person_outline)),
-      ),
+      errorWidget: const CircleAvatar(child: Icon(Icons.person_outline)),
     );
   }
 }

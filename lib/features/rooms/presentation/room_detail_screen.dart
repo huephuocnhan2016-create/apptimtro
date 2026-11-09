@@ -7,7 +7,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/network/api_error_message.dart';
+import '../../../shared/widgets/async_state_view.dart';
 import '../../map/presentation/open_street_map_layers.dart';
+import '../../../shared/format.dart';
+import '../../../shared/widgets/app_network_image.dart';
 import '../domain/room.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
@@ -26,10 +29,24 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _room = ref.read(roomRepositoryProvider).get(widget.roomId).then((room) {
-      _favorite = room.isFavorite;
-      return room;
-    });
+    _room = _load();
+  }
+
+  Future<Room> _load() =>
+      ref.read(roomRepositoryProvider).get(widget.roomId).then((room) {
+        if (mounted) _favorite = room.isFavorite;
+        return room;
+      });
+
+  void _reload() {
+    if (mounted) setState(() => _room = _load());
+  }
+
+  /// Quay về từ màn thanh toán → đọc lại phòng, để nút "Đặt cọc" đổi thành
+  /// "Bạn đã cọc" nếu vừa cọc xong.
+  Future<void> _openPayment(Room room) async {
+    await context.push('/payment', extra: room);
+    _reload();
   }
 
   @override
@@ -46,19 +63,12 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     ),
     body: FutureBuilder<Room>(
       future: _room,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Không tải được phòng: ${apiErrorMessage(snapshot.error!)}',
-            ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return _details(context, snapshot.data!);
-      },
+      builder: (context, snapshot) => AsyncStateView<Room>(
+        snapshot: snapshot,
+        errorPrefix: 'Không tải được phòng',
+        onRetry: _reload,
+        builder: _details,
+      ),
     ),
   );
 
@@ -77,11 +87,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             child: PageView(
               children: pictures
                   .map(
-                    (url) => Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
-                    ),
+                    (url) => AppNetworkImage(url, height: 250),
                   )
                   .toList(),
             ),
@@ -112,7 +118,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               ],
               const SizedBox(height: 12),
               Text(
-                '${room.price.toStringAsFixed(0)} đ/tháng',
+                '${formatVnd(room.price)}/tháng',
                 style: Theme.of(context).textTheme.titleLarge
                     ?.copyWith(color: Theme.of(context).colorScheme.primary),
               ),
@@ -177,7 +183,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               ),
               if (room.landlordAvatar != null)
                 CircleAvatar(
-                  backgroundImage: NetworkImage(room.landlordAvatar!),
+                  child: ClipOval(
+                    child: AppNetworkImage(
+                      room.landlordAvatar!,
+                      width: 40,
+                      height: 40,
+                      errorWidget: const Icon(Icons.person_outline),
+                    ),
+                  ),
                 ),
               if (room.landlordPhone != null)
                 Row(
@@ -249,7 +262,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   OutlinedButton.icon(
                     onPressed: room.hasDeposit || room.status == 'DEPOSITED'
                         ? null
-                        : () => context.push('/payment', extra: room),
+                        : () => _openPayment(room),
                     icon: const Icon(Icons.account_balance_wallet_outlined),
                     label: Text(
                       room.hasDeposit
