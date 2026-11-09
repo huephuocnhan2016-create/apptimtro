@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
 import '../../map/presentation/open_street_map_layers.dart';
 import '../domain/room.dart';
@@ -299,10 +300,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       );
       if (!mounted || request != _geocodeRequest) return;
       if (locations.isEmpty) {
-        setState(() {
-          _resolvingAddress = false;
-          _addressError = 'Thiết bị chưa tìm được tọa độ. Máy chủ sẽ thử tìm lại khi lưu phòng.';
-        });
+        _addressLookupFailed();
         return;
       }
       _setMapPosition(
@@ -310,18 +308,18 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       );
     } on PlatformException {
       if (!mounted || request != _geocodeRequest) return;
-      setState(() {
-        _resolvingAddress = false;
-        _addressError = 'Thiết bị chưa tìm được tọa độ. Máy chủ sẽ thử tìm lại khi lưu phòng.';
-      });
+      _addressLookupFailed();
     } on MissingPluginException {
       if (!mounted || request != _geocodeRequest) return;
-      setState(() {
-        _resolvingAddress = false;
-        _addressError = 'Thiết bị chưa tìm được tọa độ. Máy chủ sẽ thử tìm lại khi lưu phòng.';
-      });
+      _addressLookupFailed();
     }
   }
+
+  void _addressLookupFailed() => setState(() {
+    _resolvingAddress = false;
+    _addressError =
+        'Thiết bị chưa tìm được tọa độ. Máy chủ sẽ thử tìm lại khi lưu phòng.';
+  });
 
   void _setMapPosition(LatLng point) {
     _addressDebounce?.cancel();
@@ -358,8 +356,9 @@ class _RoomFormState extends ConsumerState<RoomForm> {
             name != 'longitude') {
           return 'Giá trị không được âm';
         }
-        if ((name == 'latitude' && (number! < -90 || number > 90)) ||
-            (name == 'longitude' && (number! < -180 || number > 180))) {
+        if (number != null &&
+            ((name == 'latitude' && (number < -90 || number > 90)) ||
+                (name == 'longitude' && (number < -180 || number > 180)))) {
           return 'Tọa độ ngoài phạm vi';
         }
         if (name == 'area' && number != null && number == 0) {
@@ -427,14 +426,30 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       final saved = widget.room == null
           ? await repository.create(data)
           : await repository.update(widget.room!.id, data);
-      for (final image in _images) {
-        await repository.uploadImage(saved.id, image.path);
-      }
+      // Tải ảnh song song. Phòng đã lưu rồi, nên ảnh lỗi chỉ báo riêng chứ
+      // không báo "Không thể lưu phòng".
+      final uploads = await Future.wait(
+        _images.map(
+          (image) => repository
+              .uploadImage(saved.id, image.path)
+              .then((_) => true, onError: (Object _) => false),
+        ),
+      );
+      final failedUploads = uploads.where((ok) => !ok).length;
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       final hasNoMapPin = saved.latitude == null || saved.longitude == null;
       context.go(widget.room == null ? '/home' : '/landlord/rooms');
-      if (hasNoMapPin) {
+      if (failedUploads > 0) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Đã lưu phòng nhưng $failedUploads/${_images.length} ảnh '
+              'tải lên không thành công. Hãy sửa phòng để thêm lại ảnh.',
+            ),
+          ),
+        );
+      } else if (hasNoMapPin) {
         messenger.showSnackBar(
           const SnackBar(
             content: Text(
@@ -448,7 +463,9 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Không thể lưu phòng: $error')));
+        ).showSnackBar(
+          SnackBar(content: Text('Không thể lưu phòng: ${apiErrorMessage(error)}')),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);

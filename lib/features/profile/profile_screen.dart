@@ -20,7 +20,7 @@ class ProfileScreen extends ConsumerWidget {
             radius: 38,
             child: Text(
               (user?.fullName?.isNotEmpty ?? false)
-                  ? user!.fullName![0].toUpperCase()
+                  ? user!.fullName!.characters.first.toUpperCase()
                   : 'T',
               style: const TextStyle(fontSize: 28),
             ),

@@ -8,23 +8,31 @@ import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/async_state_view.dart';
 import '../domain/conversation.dart';
 
+/// Danh sách cuộc trò chuyện. Trước đây future được tạo ngay trong build nên
+/// mỗi lần vẽ lại là gọi API lại; giờ chỉ tải lại khi `ref.invalidate`.
+final conversationsProvider =
+    FutureProvider.autoDispose<List<ChatConversation>>((ref) async {
+      await ref.watch(firebaseSignInProvider.future);
+      return ref.watch(messageRepositoryProvider).conversations();
+    });
+
 class ChatListScreen extends ConsumerWidget {
   const ChatListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(title: const Text('Cuộc trò chuyện')),
-    body: FutureBuilder<List<ChatConversation>>(
-      future: ref.read(firebaseSignInProvider.future).then(
-        (_) => ref.read(messageRepositoryProvider).conversations(),
-      ),
-      builder: (context, snapshot) => AsyncStateView<List<ChatConversation>>(
-        snapshot: snapshot,
+    body: AsyncStateView<List<ChatConversation>>(
+        snapshot: AsyncStateView.snapshotOf(ref.watch(conversationsProvider)),
         errorPrefix: 'Không tải được danh sách chat',
+        onRetry: () => ref.invalidate(conversationsProvider),
         emptyMessage:
             'Chưa có cuộc trò chuyện nào.\nVào Mục yêu thích và bấm icon chat để bắt đầu.',
         emptyIcon: Icons.chat_bubble_outline,
-        builder: (context, conversations) => ListView.separated(
+        builder: (context, conversations) => RefreshIndicator(
+          onRefresh: () => ref.refresh(conversationsProvider.future),
+          child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(12),
           itemCount: conversations.length,
           separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -59,8 +67,8 @@ class ChatListScreen extends ConsumerWidget {
               ),
             );
           },
+          ),
         ),
-      ),
     ),
   );
 }

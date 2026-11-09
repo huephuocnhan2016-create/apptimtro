@@ -98,6 +98,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  Stream<List<Message>>? _messages;
+  String? _messagesConversationId;
+
+  /// Mở stream Firestore một lần cho mỗi cuộc trò chuyện. Gọi thẳng
+  /// `messages(id)` trong build thì mỗi lần vẽ lại là một subscription mới.
+  Stream<List<Message>> _messagesFor(String conversationId) {
+    if (_messages == null || _messagesConversationId != conversationId) {
+      _messagesConversationId = conversationId;
+      _messages = ref.read(messageRepositoryProvider).messages(conversationId);
+    }
+    return _messages!;
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('Chat với ${widget.resolvedPeerName}')),
@@ -123,9 +136,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             Expanded(
               child: StreamBuilder(
-                stream: ref
-                    .read(messageRepositoryProvider)
-                    .messages(session.conversationId),
+                stream: _messagesFor(session.conversationId),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Center(

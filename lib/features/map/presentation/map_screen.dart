@@ -232,7 +232,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const Align(
+              alignment: Alignment.topCenter,
+              child: LinearProgressIndicator(),
+            )
           else if (_error != null)
             Align(
               alignment: Alignment.topCenter,
