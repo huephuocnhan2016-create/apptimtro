@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../rooms/domain/room.dart';
-import '../../rooms/presentation/room_search_screen.dart';
+import '../../../shared/widgets/async_state_view.dart';
+import '../../../shared/widgets/room_card.dart';
 
 class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
@@ -63,24 +64,18 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     ),
     body: FutureBuilder<List<Room>>(
       future: _favorites,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Không tải được mục yêu thích: ${apiErrorMessage(snapshot.error!)}',
-            ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.data!.isEmpty) {
-          return const Center(child: Text('Bạn chưa lưu phòng yêu thích nào.'));
-        }
-        return ListView.builder(
-          itemCount: snapshot.data!.length,
+      builder: (context, snapshot) => AsyncStateView<List<Room>>(
+        snapshot: snapshot,
+        errorPrefix: 'Không tải được mục yêu thích',
+        onRetry: () => setState(() {
+          _favorites = ref.read(roomRepositoryProvider).favorites();
+        }),
+        emptyMessage: 'Bạn chưa lưu phòng yêu thích nào.',
+        emptyIcon: Icons.favorite_border,
+        builder: (context, rooms) => ListView.builder(
+          itemCount: rooms.length,
           itemBuilder: (context, index) {
-            final room = snapshot.data![index];
+            final room = rooms[index];
             return Dismissible(
               key: ValueKey(room.id),
               direction: DismissDirection.endToStart,
@@ -107,7 +102,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                   return false;
                 }
               },
-              child: RoomListTile(
+              child: RoomCard(
                 room: room,
                 onChat: room.landlordId == null
                     ? null
@@ -115,8 +110,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               ),
             );
           },
-        );
-      },
+        ),
+      ),
     ),
   );
 }

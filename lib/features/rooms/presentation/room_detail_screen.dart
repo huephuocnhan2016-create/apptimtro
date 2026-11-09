@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../map/presentation/open_street_map_layers.dart';
+import '../../../shared/format.dart';
+import '../../../shared/widgets/app_network_image.dart';
 import '../domain/room.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
@@ -77,11 +79,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             child: PageView(
               children: pictures
                   .map(
-                    (url) => Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
-                    ),
+                    (url) => AppNetworkImage(url, height: 250),
                   )
                   .toList(),
             ),
@@ -112,7 +110,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               ],
               const SizedBox(height: 12),
               Text(
-                '${room.price.toStringAsFixed(0)} đ/tháng',
+                '${formatVnd(room.price)}/tháng',
                 style: Theme.of(context).textTheme.titleLarge
                     ?.copyWith(color: Theme.of(context).colorScheme.primary),
               ),
@@ -177,7 +175,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               ),
               if (room.landlordAvatar != null)
                 CircleAvatar(
-                  backgroundImage: NetworkImage(room.landlordAvatar!),
+                  child: ClipOval(
+                    child: AppNetworkImage(
+                      room.landlordAvatar!,
+                      width: 40,
+                      height: 40,
+                      errorWidget: const Icon(Icons.person_outline),
+                    ),
+                  ),
                 ),
               if (room.landlordPhone != null)
                 Row(

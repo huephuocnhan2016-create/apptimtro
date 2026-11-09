@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
+import '../../../shared/format.dart';
+import '../../../shared/widgets/app_network_image.dart';
+import '../../../shared/widgets/async_state_view.dart';
 import '../domain/payment_order.dart';
+import 'confirm_cancel_deposit.dart';
 
 class DepositListScreen extends ConsumerStatefulWidget {
   const DepositListScreen({super.key});
@@ -24,26 +27,14 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
     _deposits = ref.read(paymentApiProvider).deposits();
   }
 
+  void _reload() => setState(() {
+    _deposits = ref.read(paymentApiProvider).deposits();
+  });
+
   Future<void> _cancel(RoomDeposit deposit) async {
     if (_cancellingTxnRef != null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hủy đặt cọc?'),
-        content: const Text('Phòng sẽ được mở lại cho người khác đặt cọc.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Giữ cọc'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hủy cọc'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+    final confirmed = await confirmCancelDeposit(context);
+    if (!confirmed || !mounted) return;
     setState(() => _cancellingTxnRef = deposit.txnRef);
     try {
       await ref.read(paymentApiProvider).cancel(deposit.txnRef);
@@ -70,41 +61,23 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
     appBar: AppBar(
       title: const Text('Phòng đã đặt cọc'),
       actions: [
-        IconButton(
-          onPressed: () => setState(() {
-            _deposits = ref.read(paymentApiProvider).deposits();
-          }),
-          icon: const Icon(Icons.refresh),
-        ),
+        IconButton(onPressed: _reload, icon: const Icon(Icons.refresh)),
       ],
     ),
     body: FutureBuilder<List<RoomDeposit>>(
       future: _deposits,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'Không tải được danh sách đặt cọc: '
-                '${apiErrorMessage(snapshot.error!)}',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.data!.isEmpty) {
-          return const Center(child: Text('Bạn chưa đặt cọc phòng nào.'));
-        }
-        return ListView.separated(
+      builder: (context, snapshot) => AsyncStateView<List<RoomDeposit>>(
+        snapshot: snapshot,
+        errorPrefix: 'Không tải được danh sách đặt cọc',
+        onRetry: _reload,
+        emptyMessage: 'Bạn chưa đặt cọc phòng nào.',
+        emptyIcon: Icons.receipt_long_outlined,
+        builder: (context, deposits) => ListView.separated(
           padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.length,
+          itemCount: deposits.length,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
-            final deposit = snapshot.data![index];
+            final deposit = deposits[index];
             return Card(
               margin: EdgeInsets.zero,
               child: ListTile(
@@ -114,16 +87,13 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
                 ),
                 leading: deposit.roomImage == null
                     ? const CircleAvatar(child: Icon(Icons.apartment_outlined))
-                    : ClipRRect(
+                    : AppNetworkImage(
+                        deposit.roomImage!,
+                        width: 48,
+                        height: 48,
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          deposit.roomImage!,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const CircleAvatar(
-                            child: Icon(Icons.apartment_outlined),
-                          ),
+                        errorWidget: const CircleAvatar(
+                          child: Icon(Icons.apartment_outlined),
                         ),
                       ),
                 title: Text(
@@ -136,8 +106,8 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
                     Text(deposit.roomAddress),
                     const SizedBox(height: 4),
                     Text(
-                      'Cọc ${NumberFormat.decimalPattern('vi_VN').format(deposit.amount)} đ'
-                      '${deposit.payDate == null ? '' : ' · ${DateFormat('dd/MM/yyyy HH:mm').format(deposit.payDate!.toLocal())}'}',
+                      'Cọc ${formatVnd(deposit.amount)}'
+                      '${deposit.payDate == null ? '' : ' · ${formatDateVn(deposit.payDate!)}'}',
                       style: const TextStyle(fontSize: 12),
                     ),
                   ],
@@ -162,8 +132,8 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
               ),
             );
           },
-        );
-      },
+        ),
+      ),
     ),
   );
 }

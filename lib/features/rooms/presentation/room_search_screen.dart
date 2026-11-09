@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
-import '../../../core/network/api_error_message.dart';
+import '../../../shared/widgets/async_state_view.dart';
+import '../../../shared/widgets/room_card.dart';
 import '../domain/room.dart';
 
 class RoomSearchScreen extends ConsumerStatefulWidget {
@@ -71,28 +72,17 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
         Expanded(
           child: FutureBuilder<List<Room>>(
             future: _rooms,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(
-                  child: Text(
-                    'Không tìm được phòng: ${apiErrorMessage(snapshot.error!)}',
-                  ),
-                );
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.data!.isEmpty) {
-                return const Center(
-                  child: Text('Không tìm thấy phòng phù hợp.'),
-                );
-              }
-              return ListView.builder(
-                itemCount: snapshot.data!.length,
-                itemBuilder: (context, index) =>
-                    RoomListTile(room: snapshot.data![index]),
-              );
-            },
+            builder: (context, snapshot) => AsyncStateView<List<Room>>(
+              snapshot: snapshot,
+              errorPrefix: 'Không tìm được phòng',
+              onRetry: _search,
+              emptyMessage: 'Không tìm thấy phòng phù hợp.',
+              emptyIcon: Icons.search_off,
+              builder: (context, rooms) => ListView.builder(
+                itemCount: rooms.length,
+                itemBuilder: (context, index) => RoomCard(room: rooms[index]),
+              ),
+            ),
           ),
         ),
       ],
@@ -220,67 +210,3 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
       );
 }
 
-class RoomListTile extends StatelessWidget {
-  const RoomListTile({required this.room, this.onChat, super.key});
-
-  final Room room;
-  final VoidCallback? onChat;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: () => context.push('/rooms/${room.id}'),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 110,
-            height: 100,
-            child: room.image == null
-                ? const Icon(Icons.home_work_outlined)
-                : Image.network(
-                    room.image!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const Icon(Icons.broken_image_outlined),
-                  ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    room.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Text(
-                    room.address,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text('${room.price.toStringAsFixed(0)} đ/tháng'),
-                  Text(
-                    room.status == 'DEPOSITED'
-                        ? 'Đang cọc'
-                        : 'Còn ${room.availableRooms} phòng',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (onChat != null)
-            IconButton(
-              tooltip: 'Nhắn tin với chủ trọ',
-              icon: const Icon(Icons.chat_bubble_outline),
-              onPressed: onChat,
-            ),
-        ],
-      ),
-    ),
-  );
-}

@@ -10,6 +10,8 @@ import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../rooms/domain/room.dart';
+import '../../../shared/format.dart';
+import '../../../shared/widgets/app_network_image.dart';
 import 'open_street_map_layers.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -356,21 +358,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (room.image != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    room.image!,
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                  ),
+                AppNetworkImage(
+                  room.image!,
+                  height: 150,
+                  width: double.infinity,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
               const SizedBox(height: 12),
               Text(room.title, style: Theme.of(context).textTheme.titleLarge),
               Text(room.address),
               const SizedBox(height: 8),
-              Text('${room.price.toStringAsFixed(0)} đ/tháng'),
+              Text('${formatVnd(room.price)}/tháng'),
               Text('Còn ${room.availableRooms} phòng'),
               if (room.distance != null)
                 Text('Cách bạn ${room.distance!.toStringAsFixed(1)} km'),
