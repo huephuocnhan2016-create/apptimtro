@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../rooms/domain/room.dart';
 import 'open_street_map_layers.dart';
@@ -161,7 +162,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       height: 40,
                       child: const Icon(
                         Icons.my_location,
-                        color: Colors.blue,
+                        color: AppColors.mapCurrentLocation,
                         size: 30,
                       ),
                     ),

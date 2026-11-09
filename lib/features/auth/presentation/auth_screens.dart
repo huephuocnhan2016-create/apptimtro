@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
 
 import '../../../core/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../data/auth_api.dart';
 import '../domain/user.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -33,7 +34,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.house_rounded, size: 68, color: Color(0xFF1769E0)),
+          Icon(Icons.house_rounded, size: 68, color: AppColors.brand),
           SizedBox(height: 12),
           Text(
             'Trọ Tốt',
@@ -53,7 +54,7 @@ class WelcomeScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Spacer(),
-        const Icon(Icons.apartment_rounded, size: 74, color: Color(0xFF1769E0)),
+        const Icon(Icons.apartment_rounded, size: 74, color: AppColors.brand),
         const SizedBox(height: 28),
         Text(
           'Tìm trọ dễ dàng,\nan tâm bắt đầu',
@@ -484,8 +485,8 @@ class _RoleCard extends StatelessWidget {
       onTap: onTap,
       contentPadding: const EdgeInsets.all(16),
       leading: CircleAvatar(
-        backgroundColor: const Color(0xFFEAF2FF),
-        child: Icon(icon, color: const Color(0xFF1769E0)),
+        backgroundColor: AppColors.brandSoft,
+        child: Icon(icon, color: AppColors.brand),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle),
