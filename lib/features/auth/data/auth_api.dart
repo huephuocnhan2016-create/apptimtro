@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_error_message.dart';
 import '../domain/user.dart';
 
 Map<String, Object?>? _optionalFields(String? fullName, String? email) {
@@ -83,6 +84,9 @@ class AuthException implements Exception {
   final String message;
 
   static AuthException fromDio(DioException error) {
+    // Không có phản hồi = chưa tới được máy chủ (máy chủ tắt, sai địa chỉ,
+    // hết thời gian). Dùng thông báo chi tiết thay vì "kiểm tra Internet".
+    if (error.response == null) return AuthException(apiErrorMessage(error));
     final data = error.response?.data;
     if (data is Map<String, dynamic>) {
       final message = data['message'];
