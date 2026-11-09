@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  PaymentGateway,
   PaymentStatus,
   RoomStatus,
   User,
@@ -16,15 +17,19 @@ import { randomUUID } from 'node:crypto';
 import type { ReturnQueryFromVNPay } from 'vnpay';
 import { PrismaService } from '../../database/prisma.service';
 import { CreatePaymentOrderDto } from './dto/create-payment-order.dto';
+import { MomoService } from './momo.service';
 import { PaymentOrderEntity } from './payment-order.entity';
 import { VnpayService } from './vnpay.service';
 
 type PaymentRow = {
   id: string;
   roomId: string;
+  studentId: string;
   txnRef: string;
   amount: unknown;
   status: PaymentStatus;
+  gateway?: PaymentGateway;
+  gatewayRequestId?: string | null;
   transactionNo: string | null;
   responseCode: string | null;
   payDate: Date | null;
@@ -35,12 +40,65 @@ export class PaymentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vnpay: VnpayService,
+    private readonly momo: MomoService,
   ) {}
+
+  private gatewayOf(payment: { gateway?: PaymentGateway }): PaymentGateway {
+    return payment.gateway ?? PaymentGateway.VNPAY;
+  }
+
+  // Either portal running without credentials makes this a development box.
+  private get devModeEnabled(): boolean {
+    return this.vnpay.devModeEnabled || this.momo.devModeEnabled;
+  }
+
+  private devModeFor(gateway: PaymentGateway): boolean {
+    return gateway === PaymentGateway.MOMO
+      ? this.momo.devModeEnabled
+      : this.vnpay.devModeEnabled;
+  }
+
+  private async checkoutUrl(
+    payment: {
+      txnRef: string;
+      createdAt: Date;
+      gatewayRequestId: string | null;
+    },
+    gateway: PaymentGateway,
+    amount: number,
+    orderInfo: string,
+    ip: string,
+  ): Promise<{
+    payUrl: string;
+    deeplink: string | null;
+    qrCodeUrl: string | null;
+  }> {
+    if (gateway !== PaymentGateway.MOMO) {
+      return {
+        payUrl: await this.vnpay.buildCheckoutUrl({
+          amount,
+          txnRef: payment.txnRef,
+          ip,
+          createdAt: payment.createdAt,
+          orderInfo,
+        }),
+        deeplink: null,
+        qrCodeUrl: null,
+      };
+    }
+    return this.momo.createOrder({
+      amount,
+      orderId: payment.txnRef,
+      orderInfo,
+      requestId: payment.gatewayRequestId ?? payment.txnRef,
+    });
+  }
 
   async create(user: User, dto: CreatePaymentOrderDto, ip: string) {
     if (user.role !== UserRole.STUDENT) {
       throw new ForbiddenException('Only students can create payment orders.');
     }
+    const gateway = dto.gateway ?? PaymentGateway.VNPAY;
     const room = await this.prisma.room.findUnique({
       where: { id: dto.roomId },
     });
@@ -69,23 +127,30 @@ export class PaymentService {
         roomId: room.id,
         txnRef: randomUUID().replace(/-/g, ''),
         amount,
+        gateway,
+        // MoMo echoes this back on query, and reusing it keeps a retry of the
+        // same order from looking like a new one to their side.
+        gatewayRequestId: randomUUID().replace(/-/g, ''),
       },
     });
     const orderInfo = this.orderInfoFor(payment.txnRef);
     try {
-      const payUrl = this.vnpay.buildCheckoutUrl({
+      const checkout = await this.checkoutUrl(
+        payment,
+        gateway,
         amount,
-        txnRef: payment.txnRef,
-        ip,
-        createdAt: payment.createdAt,
         orderInfo,
-      });
+        ip,
+      );
       return new PaymentOrderEntity(
         payment.txnRef,
-        payUrl,
+        checkout.payUrl,
         amount,
         payment.status,
         orderInfo,
+        gateway,
+        checkout.deeplink,
+        checkout.qrCodeUrl,
       );
     } catch (error) {
       // Keeps failed orders out of the PENDING pool the status poller scans.
@@ -99,9 +164,9 @@ export class PaymentService {
     }
   }
 
-  // A student pulling out of a deposit. Money already handed to VNPay can only
-  // come back through the refund API, so with real credentials a paid deposit
-  // stays paid and the landlord settles it offline.
+  // A student pulling out of a deposit. Money already handed to a portal can
+  // only come back through that portal's refund API, so with real credentials a
+  // paid deposit stays paid and the landlord settles it offline.
   async cancel(user: User, txnRef: string) {
     if (user.role !== UserRole.STUDENT) {
       throw new ForbiddenException('Only students can cancel payment orders.');
@@ -110,9 +175,12 @@ export class PaymentService {
       where: { txnRef, studentId: user.id },
     });
     if (!payment) throw new NotFoundException('Payment order not found.');
-    if (payment.status === PaymentStatus.PAID && !this.vnpay.devModeEnabled) {
+    if (
+      payment.status === PaymentStatus.PAID &&
+      !this.devModeFor(this.gatewayOf(payment))
+    ) {
       throw new ConflictException(
-        'Tiền cọc đã vào VNPAY, hoàn tiền cần cổng refund của VNPAY.',
+        `Tiền cọc đã vào ${this.gatewayOf(payment)}, hoàn tiền cần cổng refund của ${this.gatewayOf(payment)}.`,
       );
     }
     if (
@@ -162,7 +230,7 @@ export class PaymentService {
   }
 
   async devSucceed(user: User, txnRef: string) {
-    if (!this.vnpay.devModeEnabled) {
+    if (!this.devModeEnabled) {
       throw new NotFoundException('Payment order not found.');
     }
     const payment = await this.prisma.payment.findFirst({
@@ -183,7 +251,7 @@ export class PaymentService {
   // The dev checkout page opens in a browser tab that carries no access token,
   // so it closes the order by transaction reference alone. Dev mode only.
   async devReturn(txnRef: string, responseCode: string) {
-    if (!this.vnpay.devModeEnabled) {
+    if (!this.devModeEnabled) {
       throw new NotFoundException('Payment order not found.');
     }
     const payment = await this.prisma.payment.findFirst({ where: { txnRef } });
@@ -196,7 +264,7 @@ export class PaymentService {
 
   // The dev checkout page needs something to show before the shopper decides.
   async devPreview(txnRef: string) {
-    if (!this.vnpay.devModeEnabled) {
+    if (!this.devModeEnabled) {
       throw new NotFoundException('Payment order not found.');
     }
     const payment = await this.prisma.payment.findFirst({ where: { txnRef } });
@@ -357,7 +425,42 @@ export class PaymentService {
     if (payment.status !== PaymentStatus.PENDING) {
       return this.view(payment);
     }
+    return this.gatewayOf(payment) === PaymentGateway.MOMO
+      ? this.statusMomo(payment)
+      : this.statusVnpay(payment);
+  }
 
+  // MoMo keeps the transaction id in its own column and reuses the requestId
+  // from the create call, so a gatewayRequestId from the order is required.
+  private async statusMomo(payment: PaymentRow) {
+    const result = await this.momo.queryOrder({
+      orderId: payment.txnRef,
+      requestId: payment.gatewayRequestId ?? payment.txnRef,
+    });
+    if (!result.isVerified) {
+      throw new BadGatewayException('Could not verify the MoMo response.');
+    }
+    if (result.orderId !== payment.txnRef) {
+      throw new BadGatewayException('MoMo returned a different transaction.');
+    }
+    if (result.isSuccess) {
+      if (Number(result.amount) !== Math.round(Number(payment.amount))) {
+        throw new BadGatewayException('MoMo returned a different amount.');
+      }
+      if (!result.transactionNo || !result.payDate) {
+        throw new BadGatewayException('MoMo response is missing payment data.');
+      }
+      await this.markPaid(payment, {
+        transactionNo: result.transactionNo,
+        responseCode: result.responseCode,
+        payDate: result.payDate,
+      });
+      return this.reload(payment.txnRef);
+    }
+    return this.view(payment);
+  }
+
+  private async statusVnpay(payment: PaymentRow & { createdAt: Date }) {
     const result = await this.vnpay.queryStatus({
       txnRef: payment.txnRef,
       createdAt: payment.createdAt,
@@ -387,9 +490,40 @@ export class PaymentService {
         responseCode: String(result.vnp_ResponseCode),
         payDate: this.vnpay.parsePaymentDate(result.vnp_PayDate),
       });
-      return this.reload(txnRef);
+      return this.reload(payment.txnRef);
     }
     return this.view(payment);
+  }
+
+  // MoMo sends the same signed payload twice: once to the browser and once
+  // server-to-server. Whichever arrives first writes the result; the other one
+  // finds the order already settled and only reports it back.
+  async handleMomoResult(params: Record<string, string>) {
+    const verified = this.momo.parseResult(params);
+    const txnRef = String(verified.orderId ?? '');
+    const payment = await this.prisma.payment.findFirst({ where: { txnRef } });
+    if (!payment) throw new NotFoundException('Payment order not found.');
+    if (!verified.isVerified) {
+      return { verified: false, order: this.view(payment) };
+    }
+    if (payment.status === PaymentStatus.PENDING) {
+      if (
+        verified.isSuccess &&
+        Number(verified.amount) !== Math.round(Number(payment.amount))
+      ) {
+        await this.markClosed(payment, '97');
+      } else if (verified.isSuccess) {
+        await this.markPaid(payment, {
+          transactionNo:
+            verified.transactionNo ?? this.devTransactionNo(payment.txnRef),
+          responseCode: '00',
+          payDate: verified.payDate ?? new Date(),
+        });
+      } else {
+        await this.markClosed(payment, verified.responseCode);
+      }
+    }
+    return { verified: true, order: this.view(await this.requireRow(txnRef)) };
   }
 
   private async requireRow(txnRef: string): Promise<PaymentRow> {
@@ -404,17 +538,23 @@ export class PaymentService {
 
   // Everything the result card needs, in the same shape the VNPay portal uses.
   private view(payment: PaymentRow) {
+    const gateway = this.gatewayOf(payment);
+    const describe =
+      gateway === PaymentGateway.MOMO
+        ? (code: string) => this.momo.describeResult(code)
+        : (code: string) => this.vnpay.describeResponse(code);
     const message =
       payment.status === PaymentStatus.PAID
         ? 'Giao dịch thành công'
         : payment.responseCode
-          ? this.vnpay.describeResponse(payment.responseCode)
+          ? describe(payment.responseCode)
           : 'Giao dịch chưa hoàn tất';
     return {
       status: payment.status,
       txnRef: payment.txnRef,
       amount: Math.round(Number(payment.amount)),
-      bankName: 'VNPAY',
+      gateway,
+      bankName: gateway === PaymentGateway.MOMO ? 'MOMO' : 'VNPAY',
       transactionNo: payment.transactionNo,
       responseCode: payment.responseCode,
       payDate: payment.payDate

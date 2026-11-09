@@ -6,10 +6,13 @@ class PaymentApi {
 
   final ApiClient _client;
 
-  Future<PaymentOrder> createOrder(String roomId) async {
+  Future<PaymentOrder> createOrder(
+    String roomId, {
+    String gateway = kDefaultGateway,
+  }) async {
     final response = await _client.dio.post<Map<String, dynamic>>(
       '/payment/orders',
-      data: {'roomId': roomId},
+      data: {'roomId': roomId, 'gateway': gateway},
     );
     final data = response.data;
     if (data == null) {

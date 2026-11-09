@@ -52,5 +52,16 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Payment portals open through VIEW: the browser tab for a checkout
+             page, the MoMo wallet for its deep link. Android 11+ hides both
+             from canLaunchUrl without these. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="momo"/>
+        </intent>
     </queries>
 </manifest>

@@ -1,11 +1,18 @@
 import {
+  BadGatewayException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { PaymentStatus, User, UserRole } from '@prisma/client';
+import {
+  PaymentGateway,
+  PaymentStatus,
+  User,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { MomoService } from './momo.service';
 import { PaymentService } from './payment.service';
 import { VnpayService } from './vnpay.service';
 
@@ -49,9 +56,17 @@ describe('PaymentService', () => {
     describeResponse: (code: string) => `Mã ${code}`,
     devModeEnabled: true,
   };
+  const momo = {
+    createOrder: jest.fn(),
+    queryOrder: jest.fn(),
+    parseResult: jest.fn(),
+    describeResult: (code: string) => `MoMo mã ${code}`,
+    devModeEnabled: false,
+  };
   const service = new PaymentService(
     prisma as unknown as PrismaService,
     vnpay as unknown as VnpayService,
+    momo as unknown as MomoService,
   );
 
   beforeEach(() => {
@@ -606,5 +621,267 @@ describe('PaymentService', () => {
       service.deposits({ id: 'landlord-id', role: UserRole.LANDLORD } as User),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.payment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('opens a MoMo order through the MoMo adapter', async () => {
+    const createdAt = new Date('2026-11-09T10:00:00.000Z');
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.create.mockResolvedValue({
+      id: 'payment-id',
+      txnRef: 'momo-ref',
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      gateway: PaymentGateway.MOMO,
+      gatewayRequestId: 'momo-request-id',
+      createdAt,
+    });
+    momo.createOrder.mockResolvedValue({
+      payUrl: 'https://test-payment.momo.vn/v2/gateway/pay?orderId=momo-ref',
+      deeplink: null,
+    });
+
+    const result = await service.create(
+      student,
+      { roomId: room.id, gateway: PaymentGateway.MOMO },
+      '127.0.0.1',
+    );
+
+    expect(vnpay.buildCheckoutUrl).not.toHaveBeenCalled();
+    expect(momo.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 3000000,
+        orderId: 'momo-ref',
+        requestId: 'momo-request-id',
+      }),
+    );
+    expect(result.gateway).toBe(PaymentGateway.MOMO);
+    expect(result.payUrl).toContain('test-payment.momo.vn');
+  });
+
+  it('marks a MoMo order paid from its gateway query', async () => {
+    const payDate = new Date('2026-11-09T10:15:00.000Z');
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        studentId: student.id,
+        txnRef: 'momo-ref',
+        amount: 3000000,
+        status: PaymentStatus.PENDING,
+        gateway: PaymentGateway.MOMO,
+        gatewayRequestId: 'momo-request-id',
+      })
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        studentId: student.id,
+        txnRef: 'momo-ref',
+        amount: 3000000,
+        status: PaymentStatus.PAID,
+        gateway: PaymentGateway.MOMO,
+        gatewayRequestId: 'momo-request-id',
+        transactionNo: '9042738472',
+        responseCode: '00',
+        payDate,
+      });
+    momo.queryOrder.mockResolvedValue({
+      isVerified: true,
+      isSuccess: true,
+      orderId: 'momo-ref',
+      amount: 3000000,
+      responseCode: '00',
+      transactionNo: '9042738472',
+      payDate,
+      message: 'Thanh toán thành công',
+    });
+
+    const result = await service.status(student, 'momo-ref');
+
+    expect(momo.queryOrder).toHaveBeenCalledWith({
+      orderId: 'momo-ref',
+      requestId: 'momo-request-id',
+    });
+    expect(vnpay.queryStatus).not.toHaveBeenCalled();
+    expect(tx.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'payment-id', status: PaymentStatus.PENDING },
+      data: {
+        status: PaymentStatus.PAID,
+        transactionNo: '9042738472',
+        responseCode: '00',
+        payDate,
+      },
+    });
+    expect(result.bankName).toBe('MOMO');
+    expect(result.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('refuses to book a MoMo deposit the portal priced differently', async () => {
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-id',
+      roomId: room.id,
+      studentId: student.id,
+      txnRef: 'momo-ref',
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      gateway: PaymentGateway.MOMO,
+      gatewayRequestId: 'momo-request-id',
+    });
+    momo.queryOrder.mockResolvedValue({
+      isVerified: true,
+      isSuccess: true,
+      orderId: 'momo-ref',
+      amount: 1000,
+      responseCode: '00',
+      transactionNo: '9042738472',
+      payDate: new Date('2026-11-09T10:15:00.000Z'),
+      message: 'Thanh toán thành công',
+    });
+
+    await expect(service.status(student, 'momo-ref')).rejects.toBeInstanceOf(
+      BadGatewayException,
+    );
+    expect(tx.payment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('settles a pending order from a verified MoMo result', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        studentId: student.id,
+        txnRef: 'momo-ref',
+        amount: 3000000,
+        status: PaymentStatus.PENDING,
+        gateway: PaymentGateway.MOMO,
+        gatewayRequestId: 'momo-request-id',
+        transactionNo: null,
+        responseCode: null,
+        payDate: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        studentId: student.id,
+        txnRef: 'momo-ref',
+        amount: 3000000,
+        status: PaymentStatus.CANCELLED,
+        gateway: PaymentGateway.MOMO,
+        gatewayRequestId: 'momo-request-id',
+        transactionNo: null,
+        responseCode: '24',
+        payDate: null,
+      });
+    momo.parseResult.mockReturnValue({
+      isVerified: true,
+      isSuccess: false,
+      orderId: 'momo-ref',
+      amount: 3000000,
+      responseCode: '24',
+      transactionNo: null,
+      payDate: null,
+      message: 'Bạn đã hủy giao dịch',
+    });
+
+    const result = await service.handleMomoResult({ orderId: 'momo-ref' });
+
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'payment-id', status: PaymentStatus.PENDING },
+      data: { status: PaymentStatus.CANCELLED, responseCode: '24' },
+    });
+    expect(result.verified).toBe(true);
+    expect(result.order.message).toBe('MoMo mã 24');
+    expect(result.order.gateway).toBe(PaymentGateway.MOMO);
+  });
+
+  it('books the room once when MoMo reports the same success twice', async () => {
+    const payDate = new Date('2026-11-09T10:15:00.000Z');
+    const pendingRow = {
+      id: 'payment-id',
+      roomId: room.id,
+      studentId: student.id,
+      txnRef: 'momo-ref',
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      gateway: PaymentGateway.MOMO,
+      gatewayRequestId: 'momo-request-id',
+      transactionNo: null,
+      responseCode: null,
+      payDate: null,
+    };
+    prisma.payment.findFirst
+      .mockResolvedValueOnce(pendingRow)
+      .mockResolvedValue({ ...pendingRow, status: PaymentStatus.PAID, payDate });
+    momo.parseResult.mockReturnValue({
+      isVerified: true,
+      isSuccess: true,
+      orderId: 'momo-ref',
+      amount: 3000000,
+      responseCode: '00',
+      transactionNo: '9042738472',
+      payDate,
+      message: 'Thành công.',
+    });
+
+    await service.handleMomoResult({ orderId: 'momo-ref' });
+    await service.handleMomoResult({ orderId: 'momo-ref' });
+
+    // The browser return and the server IPN carry the same signed result, so
+    // only the first one may move the order out of PENDING.
+    expect(tx.payment.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes nothing for a MoMo result whose signature does not match', async () => {
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-id',
+      roomId: room.id,
+      studentId: student.id,
+      txnRef: 'momo-ref',
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      gateway: PaymentGateway.MOMO,
+      gatewayRequestId: 'momo-request-id',
+      transactionNo: null,
+      responseCode: null,
+      payDate: null,
+    });
+    momo.parseResult.mockReturnValue({
+      isVerified: false,
+      isSuccess: false,
+      orderId: 'momo-ref',
+      amount: 3000000,
+      responseCode: '0',
+      transactionNo: null,
+      payDate: null,
+      message: '',
+    });
+
+    const result = await service.handleMomoResult({ orderId: 'momo-ref' });
+
+    expect(result.verified).toBe(false);
+    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refunds only through the portal the deposit was paid into', async () => {
+    // MoMo has real credentials here while VNPay is still a dev mock.
+    vnpay.devModeEnabled = true;
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-id',
+      roomId: room.id,
+      studentId: student.id,
+      txnRef: 'momo-ref',
+      amount: 3000000,
+      status: PaymentStatus.PAID,
+      gateway: PaymentGateway.MOMO,
+      gatewayRequestId: 'momo-request-id',
+      transactionNo: '9042738472',
+      responseCode: '00',
+      payDate: new Date('2026-11-09T10:00:00.000Z'),
+    });
+
+    // VNPay may still be in dev mode here; the MoMo order is not.
+    await expect(service.cancel(student, 'momo-ref')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
   });
 });
