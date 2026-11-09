@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
+import '../../../shared/format.dart';
+import '../../../shared/widgets/app_network_image.dart';
+import '../../../shared/widgets/async_state_view.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 import '../../rooms/domain/room.dart';
 
 class LandlordDashboardScreen extends StatelessWidget {
@@ -72,35 +76,27 @@ class _MyRoomsScreenState extends ConsumerState<MyRoomsScreen> {
     ),
     body: FutureBuilder<List<Room>>(
       future: _rooms,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Không tải được phòng: ${snapshot.error}'));
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.data!.isEmpty) {
-          return const Center(child: Text('Bạn chưa đăng phòng nào.'));
-        }
-        return RefreshIndicator(
+      builder: (context, snapshot) => AsyncStateView<List<Room>>(
+        snapshot: snapshot,
+        errorPrefix: 'Không tải được phòng',
+        onRetry: _reload,
+        emptyMessage: 'Bạn chưa đăng phòng nào.',
+        emptyIcon: Icons.add_home_outlined,
+        builder: (context, rooms) => RefreshIndicator(
           onRefresh: () async => _reload(),
           child: ListView.builder(
-            itemCount: snapshot.data!.length,
+            itemCount: rooms.length,
             itemBuilder: (context, index) {
-              final room = snapshot.data![index];
+              final room = rooms[index];
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: ListTile(
                   leading: room.image == null
                       ? const Icon(Icons.home_work_outlined)
-                      : Image.network(
-                          room.image!,
-                          width: 56,
-                          fit: BoxFit.cover,
-                        ),
+                      : AppNetworkImage(room.image!, width: 56, height: 56),
                   title: Text(room.title),
                   subtitle: Text(
-                    '${room.price.toStringAsFixed(0)} đ · còn ${room.availableRooms}/${room.totalRooms} phòng',
+                    '${formatVnd(room.price)} · còn ${room.availableRooms}/${room.totalRooms} phòng',
                   ),
                   onTap: () => context.push('/rooms/${room.id}'),
                   trailing: PopupMenuButton<String>(
@@ -118,8 +114,8 @@ class _MyRoomsScreenState extends ConsumerState<MyRoomsScreen> {
               );
             },
           ),
-        );
-      },
+        ),
+      ),
     ),
   );
 
@@ -135,24 +131,14 @@ class _MyRoomsScreenState extends ConsumerState<MyRoomsScreen> {
         );
         if (count != null) await repository.setAvailability(room.id, count);
       } else if (action == 'delete') {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Xóa phòng?'),
-            content: Text('Bạn có chắc muốn xóa "${room.title}" không?'),
-            actions: [
-              TextButton(
-                onPressed: () => context.pop(false),
-                child: const Text('Hủy'),
-              ),
-              FilledButton(
-                onPressed: () => context.pop(true),
-                child: const Text('Xóa'),
-              ),
-            ],
-          ),
+        final confirmed = await confirmDialog(
+          context,
+          title: 'Xóa phòng?',
+          body: 'Bạn có chắc muốn xóa "${room.title}" không?',
+          confirmLabel: 'Xóa',
+          danger: true,
         );
-        if (confirmed == true) await repository.delete(room.id);
+        if (confirmed) await repository.delete(room.id);
       }
       _reload();
     } catch (error) {

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/providers.dart';
 import '../../rooms/domain/room.dart';
+import '../../../shared/format.dart';
 import '../domain/message.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -199,7 +199,7 @@ class _MessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final time = message.createdAt == null
         ? (message.pending ? 'đang gửi…' : '')
-        : DateFormat.Hm().format(message.createdAt!.toLocal());
+        : formatTimeVn(message.createdAt!);
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(

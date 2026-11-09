@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_error_message.dart';
@@ -13,6 +12,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../rooms/domain/room.dart';
 import '../domain/momo_result_codes.dart';
 import '../domain/payment_order.dart';
+import '../../../shared/format.dart';
+import 'confirm_cancel_deposit.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({this.room, this.txnRef, super.key})
@@ -247,26 +248,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Future<void> _cancelDeposit() async {
     final txnRef = _activeTxnRef;
     if (txnRef == null || _cancelling) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hủy đặt cọc?'),
-        content: const Text(
-          'Phòng sẽ được mở lại cho người khác đặt cọc.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Giữ cọc'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hủy cọc'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+    final confirmed = await confirmCancelDeposit(context);
+    if (!confirmed || !mounted) return;
     setState(() => _cancelling = true);
     try {
       final result = await ref.read(paymentApiProvider).cancel(txnRef);
@@ -549,7 +532,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         _Field(
           label: 'Số tiền thanh toán',
           value:
-              '${NumberFormat.decimalPattern('vi_VN').format(order.amount)} VND',
+              formatVnd(order.amount, unit: 'VND'),
           emphasize: true,
         ),
         const SizedBox(height: 12),
@@ -799,7 +782,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           _DetailRow(
             label: 'Số tiền',
             value:
-                '${NumberFormat.decimalPattern('vi_VN').format(result.amount)} VND',
+                formatVnd(result.amount, unit: 'VND'),
           ),
           _DetailRow(label: 'Mã giao dịch', value: result.txnRef),
           _DetailRow(label: 'Ngân hàng', value: result.bankName),
