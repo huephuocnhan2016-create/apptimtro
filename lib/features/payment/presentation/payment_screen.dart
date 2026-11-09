@@ -13,7 +13,9 @@ import '../../rooms/domain/room.dart';
 import '../domain/momo_result_codes.dart';
 import '../domain/payment_order.dart';
 import '../../../shared/format.dart';
+import '../../../shared/widgets/section_card.dart';
 import 'confirm_cancel_deposit.dart';
+import 'widgets/gateway_widgets.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({this.room, this.txnRef, super.key})
@@ -347,7 +349,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           },
           icon: const Icon(Icons.chevron_left, color: AppColors.ink),
         ),
-        _BrandMark(
+        BrandMark(
           label: _isMomo ? 'M' : 'VN',
           brand: _portalBrand,
         ),
@@ -378,7 +380,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         ),
         const SizedBox(width: 8),
         if (_isSandbox)
-          const _Pill(
+          const StatusPill(
             label: 'SANDBOX',
             background: AppColors.warningSoft,
             foreground: AppColors.warningInk,
@@ -412,7 +414,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _Pill(
+        const StatusPill(
           label: 'CÔNG THANH TOÁN TRỰC TUYẾN',
           background: AppColors.onBrandOverlay,
           foreground: Colors.white,
@@ -437,8 +439,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           spacing: 8,
           runSpacing: 8,
           children: const [
-            _HeroBadge(icon: Icons.lock_outline, label: 'Bảo mật'),
-            _HeroBadge(
+            HeroBadge(icon: Icons.lock_outline, label: 'Bảo mật'),
+            HeroBadge(
               icon: Icons.verified_user_outlined,
               label: 'Xác thực giao dịch',
             ),
@@ -448,7 +450,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     ),
   );
 
-  Widget _errorCard() => _Card(
+  Widget _errorCard() => SectionCard(
     title: 'Không tạo được yêu cầu đặt cọc',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -466,13 +468,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     ),
   );
 
-  Widget _gatewayPicker() => _Card(
+  Widget _gatewayPicker() => SectionCard(
     title: 'Chọn cổng thanh toán',
     subtitle: 'App tạo yêu cầu sau khi bạn chọn, chưa trừ tiền ở bước này',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _GatewayOption(
+        GatewayOption(
           value: 'VNPAY',
           selected: _gateway == 'VNPAY',
           brand: AppColors.brand,
@@ -482,7 +484,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           onSelect: (value) => setState(() => _gateway = value),
         ),
         const SizedBox(height: 10),
-        _GatewayOption(
+        GatewayOption(
           value: 'MOMO',
           selected: _gateway == 'MOMO',
           brand: AppColors.momo,
@@ -523,20 +525,20 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     ),
   );
 
-  Widget _infoCard(PaymentOrder order) => _Card(
+  Widget _infoCard(PaymentOrder order) => SectionCard(
     title: 'Thông tin thanh toán',
     subtitle: 'Kiểm tra thông tin trước khi tiếp tục',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Field(
+        LabeledField(
           label: 'Số tiền thanh toán',
           value:
               formatVnd(order.amount, unit: 'VND'),
           emphasize: true,
         ),
         const SizedBox(height: 12),
-        _Field(label: 'Nội dung thanh toán', value: order.orderInfo),
+        LabeledField(label: 'Nội dung thanh toán', value: order.orderInfo),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -673,12 +675,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   );
 
   // Returned from the portal with a reference but no room in hand.
-  Widget _referenceCard() => _Card(
+  Widget _referenceCard() => SectionCard(
     title: 'Thông tin thanh toán',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Field(
+        LabeledField(
           label: 'Mã tham chiếu',
           value: widget.txnRef!,
           emphasize: true,
@@ -741,7 +743,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     final color = settled
         ? (result.status == 'PAID' ? AppColors.success : AppColors.failure)
         : AppColors.muted;
-    return _Card(
+    return SectionCard(
       title: 'Trạng thái giao dịch',
       trailing: Icon(
         settled
@@ -765,13 +767,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           Wrap(
             spacing: 8,
             children: [
-              _Pill(
+              StatusPill(
                 label: _stateLabel(result),
                 background: _stateBackground(result),
                 foreground: color,
               ),
               if (result.responseCode != null)
-                _Pill(
+                StatusPill(
                   label: 'Mã ${result.responseCode}',
                   background: AppColors.neutralSoft,
                   foreground: AppColors.ink,
@@ -779,22 +781,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             ],
           ),
           const SizedBox(height: 14),
-          _DetailRow(
+          DetailRow(
             label: 'Số tiền',
             value:
                 formatVnd(result.amount, unit: 'VND'),
           ),
-          _DetailRow(label: 'Mã giao dịch', value: result.txnRef),
-          _DetailRow(label: 'Ngân hàng', value: result.bankName),
+          DetailRow(label: 'Mã giao dịch', value: result.txnRef),
+          DetailRow(label: 'Ngân hàng', value: result.bankName),
           if (result.transactionNo != null)
-            _DetailRow(
+            DetailRow(
               label: 'Mã giao dịch ${_portalDisplayName(result.gateway)}',
               value: result.transactionNo!,
             ),
           if (result.payDate != null)
-            _DetailRow(
+            DetailRow(
               label: 'Thời gian thanh toán',
-              value: _formatPayDate(result.payDate!),
+              value: formatGatewayPayDate(result.payDate!),
             ),
         ],
       ),
@@ -855,7 +857,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         : AppColors.failureSoft;
   }
 
-  Widget _debugCard() => _Card(
+  Widget _debugCard() => SectionCard(
     title: 'Nhật ký cổng thanh toán',
     subtitle: 'Bản debug: yêu cầu và trả lời của cổng',
     child: Column(
@@ -877,307 +879,4 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     ),
   );
 
-  String _formatPayDate(String value) {
-    if (value.length != 14) return value;
-    final year = value.substring(0, 4);
-    final month = value.substring(4, 6);
-    final day = value.substring(6, 8);
-    final hour = value.substring(8, 10);
-    final minute = value.substring(10, 12);
-    final second = value.substring(12, 14);
-    return '$day/$month/$year $hour:$minute:$second';
-  }
-}
-
-class _BrandMark extends StatelessWidget {
-  const _BrandMark({required this.label, required this.brand});
-
-  /// The portal's own short mark, as the header shows it.
-  final String label;
-  final Color brand;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 38,
-    height: 38,
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: brand,
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Text(
-      label,
-      style: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w800,
-        fontSize: 14,
-      ),
-    ),
-  );
-}
-
-/// One row of the portal chooser. The app makes no gateway decision of its own:
-/// picking a row only says which portal the order should be opened through.
-class _GatewayOption extends StatelessWidget {
-  const _GatewayOption({
-    required this.value,
-    required this.selected,
-    required this.brand,
-    required this.mark,
-    required this.name,
-    required this.detail,
-    required this.onSelect,
-  });
-
-  final String value;
-  final bool selected;
-  final Color brand;
-  final String mark;
-  final String name;
-  final String detail;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: () => onSelect(value),
-    borderRadius: BorderRadius.circular(12),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.brandSoft : Colors.white,
-        border: Border.all(
-          color: selected ? brand : AppColors.border,
-          width: selected ? 1.5 : 1,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            selected
-                ? Icons.radio_button_checked
-                : Icons.radio_button_unchecked,
-            color: selected ? brand : AppColors.subtle,
-            size: 22,
-          ),
-          const SizedBox(width: 12),
-          _BrandMark(label: mark, brand: brand),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  detail,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({
-    required this.label,
-    required this.background,
-    required this.foreground,
-  });
-
-  final String label;
-  final Color background;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      color: background,
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(
-        color: foreground,
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.4,
-      ),
-    ),
-  );
-}
-
-class _HeroBadge extends StatelessWidget {
-  const _HeroBadge({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-    decoration: BoxDecoration(
-      color: AppColors.scrim,
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: Colors.white, size: 14),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
-      ],
-    ),
-  );
-}
-
-class _Card extends StatelessWidget {
-  const _Card({
-    required this.title,
-    required this.child,
-    this.subtitle,
-    this.trailing,
-  });
-
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.shadow,
-          blurRadius: 16,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            ?trailing,
-          ],
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            subtitle!,
-            style: const TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-        ],
-        const SizedBox(height: 14),
-        child,
-      ],
-    ),
-  );
-}
-
-class _Field extends StatelessWidget {
-  const _Field({
-    required this.label,
-    required this.value,
-    this.emphasize = false,
-  });
-
-  final String label;
-  final String value;
-  final bool emphasize;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      border: Border.all(color: AppColors.border),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: emphasize ? 17 : 13,
-              fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            style: const TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              color: AppColors.ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
