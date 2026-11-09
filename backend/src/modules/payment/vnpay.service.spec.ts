@@ -25,14 +25,64 @@ describe('VnpayService', () => {
     );
   });
 
-  it('reports missing merchant credentials on the first call, not at startup', () => {
-    const service = new VnpayService(fakeConfig({ VNPAY_TMN_CODE: '' }));
+  it('refuses to pay in production when merchant credentials are missing', () => {
+    const service = new VnpayService(
+      fakeConfig({ NODE_ENV: 'production', VNPAY_TMN_CODE: '' }),
+    );
+    const createdAt = new Date('2026-11-08T10:00:00.000Z');
 
     expect(() =>
       service.queryStatus({
         txnRef: '20261108ABCD',
-        createdAt: new Date('2026-11-08T10:00:00.000Z'),
+        createdAt,
+        amount: 1500000,
       }),
     ).toThrow(ServiceUnavailableException);
+    expect(() =>
+      service.buildCheckoutUrl({
+        amount: 1500000,
+        txnRef: '20261108ABCD',
+        ip: '127.0.0.1',
+        createdAt,
+        orderInfo: 'Dat coc tro tot 20261108ABCD',
+      }),
+    ).toThrow(ServiceUnavailableException);
+  });
+
+  it('serves a dev checkout page and a pending status while credentials are absent', async () => {
+    const service = new VnpayService(
+      fakeConfig({
+        NODE_ENV: 'development',
+        PUBLIC_API_URL: 'http://10.0.2.2:3300',
+      }),
+    );
+
+    const url = service.buildCheckoutUrl({
+      amount: 1500000,
+      txnRef: '20261108ABCD',
+      ip: '127.0.0.1',
+      createdAt: new Date('2026-11-08T10:00:00.000Z'),
+      orderInfo: 'Dat coc tro tot 20261108ABCD',
+    });
+    expect(url).toBe(
+      'http://10.0.2.2:3300/api/payment/dev/checkout/20261108ABCD',
+    );
+
+    const status = await service.queryStatus({
+      txnRef: '20261108ABCD',
+      createdAt: new Date('2026-11-08T10:00:00.000Z'),
+      amount: 1500000,
+    });
+    expect(status.isVerified).toBe(true);
+    expect(status.isSuccess).toBe(false);
+    expect(status.vnp_TxnRef).toBe('20261108ABCD');
+    expect(status.vnp_Amount).toBe(150000000);
+  });
+
+  it('round-trips VNPay payment stamps through GMT+7', () => {
+    const service = new VnpayService(fakeConfig({}));
+
+    const parsed = service.parsePaymentDate(20260927102708);
+    expect(service.formatPaymentDate(parsed)).toBe('20260927102708');
   });
 });

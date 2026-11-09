@@ -264,7 +264,11 @@ class RoomListTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text('${room.price.toStringAsFixed(0)} đ/tháng'),
-                  Text('Còn ${room.availableRooms} phòng'),
+                  Text(
+                    room.status == 'DEPOSITED'
+                        ? 'Đang cọc'
+                        : 'Còn ${room.availableRooms} phòng',
+                  ),
                 ],
               ),
             ),

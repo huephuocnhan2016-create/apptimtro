@@ -57,7 +57,7 @@ least 32 characters for JWT access, JWT refresh, and OTP. The committed
 | `ACCESS_TOKEN_SECONDS`, `REFRESH_TOKEN_DAYS`, `OTP_TTL_MINUTES` | Token lifetimes |
 | `DEV_OTP_ENABLED` | Development-only OTP output; must be false in production |
 | `CORS_ORIGIN` | Comma-separated allowed origins; `*` is rejected in production |
-| `PUBLIC_API_URL` | Public backend origin used in local image URLs |
+| `PUBLIC_API_URL` | Public backend origin used in local image URLs and the VNPay return/checkout URLs |
 | `NOMINATIM_EMAIL` | Optional contact identifier sent with Nominatim address lookups |
 | `VNPAY_TMN_CODE`, `VNPAY_SECURE_SECRET` | VNPay merchant credentials; keep the secret only in `backend/.env` |
 | `VNPAY_HASH_ALGORITHM` | Optional signing algorithm (`SHA512` by default) |
@@ -174,15 +174,37 @@ comma-separated `amenities`, optional coordinates and `radius`; sort accepts
 `distance`, `price_asc`, `price_desc`, `newest`. Radius search is executed in
 PostGIS, not in the client.
 
-### Payments
+### Deposits
 
-- `POST /api/payment/orders` creates an authenticated VNPay QR order for a room.
-  The amount is read from the room price in PostgreSQL; clients cannot set it.
-- `GET /api/payment/orders/:txnRef/status` checks the authenticated student's
-  order against VNPay and updates it to `PAID` only after response verification.
-- The integration currently targets the VNPay sandbox and the app polls the
-  status while displaying the QR. Configure `VNPAY_TMN_CODE` and
-  `VNPAY_SECURE_SECRET` in `backend/.env`; never commit either value.
+- `POST /api/payment/orders` creates an authenticated deposit order and returns
+  the server-signed VNPay portal URL (`payUrl`) together with `txnRef`,
+  `amount` and `orderInfo`. The amount is read from the room deposit in
+  PostgreSQL; clients cannot set it. A listing that is already `DEPOSITED` or
+  has no free room left answers `409`.
+- The app opens `payUrl` in an in-app browser tab. VNPay then redirects to
+  `GET /api/payment/vnpay/return`, a public endpoint that re-checks the
+  checksum and renders the result page. The app has no deep link back from that
+  page: it refreshes the order when it returns to the foreground and keeps
+  polling every 3 seconds. Configure `VNPAY_TMN_CODE`, `VNPAY_SECURE_SECRET`
+  and a device-reachable `PUBLIC_API_URL` (the redirect target) in
+  `backend/.env`; never commit either credential.
+- `GET /api/payment/orders/:txnRef/status` verifies the order against VNPay
+  (`queryDr`) and returns the full transaction view — status, amount, bank,
+  `transactionNo`, `responseCode`, `payDate` and a Vietnamese message. It moves
+  the order to `PAID` only after a verified `00` response.
+- A `PAID` deposit books one of the listing's rooms: `availableRooms` drops by
+  one, and when it reaches zero the listing turns `DEPOSITED`. Deposited
+  listings stay in search results and favourites so students can see they are
+  taken, but no further deposit is accepted until the landlord raises
+  availability again.
+- Without merchant credentials a non-production backend hands the app a
+  stand-in portal page, `GET /api/payment/dev/checkout/:txnRef`, styled like the
+  VNPay page. Its Xác nhận / Hủy links close the order through
+  `GET /api/payment/dev/return/:txnRef?code=00|24`, so both the success and the
+  cancellation path are testable; production still answers `503`.
+- `POST /api/payment/dev/succeed/:txnRef` with the student's access token marks
+  a pending order `PAID` directly. It only exists while the dev stand-in is
+  active — with real credentials configured it answers `404`.
 
 ## 11. Database structure
 
@@ -209,10 +231,12 @@ npx.cmd prisma migrate status
 
 ## 13. Current provider limitations
 
-The payment workflow currently supports sandbox QR orders and status polling;
-payment history, IPN, refunds, and automatic expiration are not included. Local
-image storage is intended for development, not horizontally scaled production
-deployments.
+The deposit workflow uses the hosted VNPay portal page and status polling;
+payment history, IPN, refunds, and automatic expiration are not included. There
+is no deep link from the portal result page back into the app, so the student
+has to return to it by hand. A cancelled or refunded deposit does not give the
+booked room back. Local image storage is intended for development, not
+horizontally scaled production deployments.
 
 ## 14. Production recommendations
 

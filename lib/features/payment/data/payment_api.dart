@@ -18,14 +18,14 @@ class PaymentApi {
     return PaymentOrder.fromJson(data);
   }
 
-  Future<String> status(String txnRef) async {
+  Future<PaymentResult> status(String txnRef) async {
     final response = await _client.dio.get<Map<String, dynamic>>(
       '/payment/orders/$txnRef/status',
     );
-    final status = response.data?['status'];
-    if (status is! String) {
+    final data = response.data;
+    if (data == null) {
       throw const FormatException('Invalid payment status response.');
     }
-    return status;
+    return PaymentResult.fromJson(data);
   }
 }

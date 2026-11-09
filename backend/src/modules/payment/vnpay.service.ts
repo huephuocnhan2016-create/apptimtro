@@ -5,16 +5,36 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { HashAlgorithm, VNPay, dateFormat } from 'vnpay';
+import {
+  HashAlgorithm,
+  ProductCode,
+  VNPay,
+  VnpLocale,
+  dateFormat,
+  getResponseByStatusCode,
+} from 'vnpay';
+import type { ReturnQueryFromVNPay, VerifyReturnUrl } from 'vnpay';
 
 @Injectable()
 export class VnpayService {
   private cachedClient?: VNPay;
   private readonly queryIp: string;
+  private readonly publicApiUrl: string;
 
   constructor(private readonly config: ConfigService) {
     this.queryIp =
       this.config.get<string>('VNPAY_QUERY_IP_ADDR') ?? '127.0.0.1';
+    this.publicApiUrl = (
+      this.config.get<string>('PUBLIC_API_URL') ?? 'http://localhost:3000'
+    ).replace(/\/+$/, '');
+  }
+
+  get returnUrl(): string {
+    return `${this.publicApiUrl}/api/payment/vnpay/return`;
+  }
+
+  devCheckoutUrl(txnRef: string): string {
+    return `${this.publicApiUrl}/api/payment/dev/checkout/${encodeURIComponent(txnRef)}`;
   }
 
   // Built on first use so a machine without merchant credentials still boots.
@@ -42,32 +62,84 @@ export class VnpayService {
     return this.cachedClient;
   }
 
-  async createQr(input: {
+  private get hasCredentials(): boolean {
+    return Boolean(
+      this.config.get<string>('VNPAY_TMN_CODE') &&
+        this.config.get<string>('VNPAY_SECURE_SECRET'),
+    );
+  }
+
+  // Dev stand-ins only exist off production and only until real credentials land.
+  get devModeEnabled(): boolean {
+    return (
+      this.config.get<string>('NODE_ENV') !== 'production' && !this.hasCredentials
+    );
+  }
+
+  private devMock<T>(response: T): T {
+    if (!this.devModeEnabled) {
+      throw new ServiceUnavailableException(
+        'VNPay merchant credentials are not configured.',
+      );
+    }
+    return response;
+  }
+
+  // The portal page is what the shopper actually sees, so the whole signed URL
+  // is handed to the app instead of a QR payload.
+  buildCheckoutUrl(input: {
     amount: number;
     txnRef: string;
     ip: string;
     createdAt: Date;
-  }) {
-    const result = await this.client.generateQr({
+    orderInfo: string;
+  }): string {
+    if (!this.hasCredentials) {
+      return this.devMock(this.devCheckoutUrl(input.txnRef));
+    }
+    return this.client.buildPaymentUrl({
       vnp_Amount: input.amount,
       vnp_TxnRef: input.txnRef,
       vnp_IpAddr: input.ip,
-      vnp_OrderInfo: `Tro Tot ${input.txnRef}`,
+      vnp_OrderInfo: input.orderInfo,
+      vnp_OrderType: ProductCode.Other,
+      vnp_Locale: VnpLocale.VN,
+      vnp_ReturnUrl: this.returnUrl,
       vnp_CreateDate: dateFormat(input.createdAt),
       vnp_ExpireDate: dateFormat(new Date(Date.now() + 15 * 60_000)),
-      // Required by the SDK request type but unused by genqr.
-      vnp_ReturnUrl: 'https://localhost',
     });
-    if (result.code !== '00' || !result.qrcontent) {
-      throw new BadGatewayException('VNPay did not return a valid QR code.');
+  }
+
+  verifyReturn(query: ReturnQueryFromVNPay): VerifyReturnUrl {
+    if (!this.hasCredentials) {
+      throw new ServiceUnavailableException(
+        'VNPay merchant credentials are not configured.',
+      );
     }
-    return result;
+    return this.client.verifyReturnUrl(query);
+  }
+
+  describeResponse(responseCode?: string): string {
+    return getResponseByStatusCode(responseCode, VnpLocale.VN);
   }
 
   queryStatus(input: {
     txnRef: string;
     createdAt: Date;
+    amount: number;
   }) {
+    if (!this.hasCredentials) {
+      return this.devMock({
+        isVerified: true,
+        isSuccess: false,
+        vnp_TxnRef: input.txnRef,
+        vnp_Amount: Math.round(input.amount * 100),
+        vnp_ResponseCode: '00',
+        vnp_TransactionStatus: '01',
+        vnp_TransactionNo: undefined,
+        vnp_PayDate: undefined,
+      });
+    }
     const paymentDate = dateFormat(input.createdAt);
     const request = {
       vnp_RequestId: randomUUID().replace(/-/g, ''),
@@ -99,5 +171,19 @@ export class VnpayService {
         Number(digits.slice(12, 14)),
       ),
     );
+  }
+
+  // Inverse of parsePaymentDate, so the app can echo the stamp VNPay itself shows.
+  formatPaymentDate(value: Date): string {
+    const gmt7 = new Date(value.getTime() + 7 * 3600_000);
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return [
+      gmt7.getUTCFullYear(),
+      pad(gmt7.getUTCMonth() + 1),
+      pad(gmt7.getUTCDate()),
+      pad(gmt7.getUTCHours()),
+      pad(gmt7.getUTCMinutes()),
+      pad(gmt7.getUTCSeconds()),
+    ].join('');
   }
 }

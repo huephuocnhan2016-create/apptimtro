@@ -1,4 +1,8 @@
-import { NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PaymentStatus, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { PaymentService } from './payment.service';
@@ -12,21 +16,36 @@ const student = {
 const room = {
   id: 'ab8f513e-b394-42e3-98bc-b29e0f9ffbbd',
   price: { toString: () => '1500000.00' },
+  deposit: { toString: () => '3000000.00' },
+  availableRooms: 2,
+  status: 'AVAILABLE',
 };
 
 describe('PaymentService', () => {
+  const tx = {
+    payment: { updateMany: jest.fn() },
+    room: { updateMany: jest.fn() },
+  };
   const prisma = {
+    $transaction: jest.fn((work: (client: typeof tx) => Promise<unknown>) =>
+      work(tx),
+    ),
     room: { findUnique: jest.fn() },
     payment: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
     },
   };
   const vnpay = {
-    createQr: jest.fn(),
+    buildCheckoutUrl: jest.fn(),
     queryStatus: jest.fn(),
     parsePaymentDate: jest.fn(),
+    formatPaymentDate: (value: Date) =>
+      value.toISOString().replace(/\D/g, '').slice(0, 14),
+    describeResponse: (code: string) => `Mã ${code}`,
+    devModeEnabled: true,
   };
   const service = new PaymentService(
     prisma as unknown as PrismaService,
@@ -35,6 +54,8 @@ describe('PaymentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    tx.payment.updateMany.mockResolvedValue({ count: 1 });
+    tx.room.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('rejects orders for rooms that do not exist', async () => {
@@ -46,21 +67,19 @@ describe('PaymentService', () => {
     expect(prisma.payment.create).not.toHaveBeenCalled();
   });
 
-  it('uses the room price from the database for the payment order', async () => {
+  it('uses the room deposit from the database for the payment order', async () => {
     const createdAt = new Date('2026-11-08T10:00:00.000Z');
     prisma.room.findUnique.mockResolvedValue(room);
     prisma.payment.create.mockResolvedValue({
       id: 'payment-id',
       txnRef: 'transaction-ref',
-      amount: 1500000,
+      amount: 3000000,
       status: PaymentStatus.PENDING,
       createdAt,
     });
-    vnpay.createQr.mockResolvedValue({
-      code: '00',
-      qrcontent: 'qr-content',
-      message: 'Success',
-    });
+    vnpay.buildCheckoutUrl.mockReturnValue(
+      'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=transaction-ref',
+    );
 
     const result = await service.create(
       student,
@@ -71,13 +90,54 @@ describe('PaymentService', () => {
     expect(prisma.payment.create.mock.calls[0][0].data).toMatchObject({
       studentId: student.id,
       roomId: room.id,
-      amount: 1500000,
+      amount: 3000000,
     });
-    expect(vnpay.createQr).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 1500000, createdAt }),
+    expect(vnpay.buildCheckoutUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 3000000, createdAt }),
     );
-    expect(result.amount).toBe(1500000);
-    expect(result.qrcontent).toBe('qr-content');
+    expect(result.amount).toBe(3000000);
+    expect(result.payUrl).toContain('vpcpay.html');
+  });
+
+  it('refuses a deposit on a listing that is already deposited', async () => {
+    prisma.room.findUnique.mockResolvedValue({
+      ...room,
+      status: 'DEPOSITED',
+      availableRooms: 0,
+    });
+
+    await expect(
+      service.create(student, { roomId: room.id }, '127.0.0.1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('marks the order failed when no checkout URL can be built', async () => {
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.create.mockResolvedValue({
+      id: 'payment-id',
+      txnRef: 'transaction-ref',
+      amount: 1500000,
+      status: PaymentStatus.PENDING,
+      createdAt: new Date('2026-11-08T10:00:00.000Z'),
+    });
+    vnpay.buildCheckoutUrl.mockImplementation(() => {
+      throw new ServiceUnavailableException(
+        'VNPay merchant credentials are not configured.',
+      );
+    });
+    prisma.payment.update.mockResolvedValue({
+      id: 'payment-id',
+      status: PaymentStatus.FAILED,
+    });
+
+    await expect(
+      service.create(student, { roomId: room.id }, '127.0.0.1'),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'payment-id' },
+      data: { status: PaymentStatus.FAILED },
+    });
   });
 
   it('keeps the order pending when VNPay reports a non-success status', async () => {
@@ -101,7 +161,7 @@ describe('PaymentService', () => {
     const result = await service.status(student, 'transaction-ref');
 
     expect(result.status).toBe(PaymentStatus.PENDING);
-    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    expect(tx.payment.updateMany).not.toHaveBeenCalled();
   });
 
   it('does not expose payment orders belonging to another student', async () => {
@@ -121,14 +181,29 @@ describe('PaymentService', () => {
 
   it('marks an order paid only after a verified successful response', async () => {
     const payDate = new Date('2026-11-08T10:15:00.000Z');
-    prisma.payment.findFirst.mockResolvedValue({
-      id: 'payment-id',
-      txnRef: 'transaction-ref',
-      studentId: student.id,
-      amount: 1500000,
-      status: PaymentStatus.PENDING,
-      createdAt: new Date('2026-11-08T10:00:00.000Z'),
-    });
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        txnRef: 'transaction-ref',
+        studentId: student.id,
+        amount: 1500000,
+        status: PaymentStatus.PENDING,
+        transactionNo: null,
+        responseCode: null,
+        payDate: null,
+        createdAt: new Date('2026-11-08T10:00:00.000Z'),
+      })
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        txnRef: 'transaction-ref',
+        studentId: student.id,
+        amount: 1500000,
+        status: PaymentStatus.PAID,
+        transactionNo: '12345',
+        responseCode: '00',
+        payDate,
+        createdAt: new Date('2026-11-08T10:00:00.000Z'),
+      });
     vnpay.queryStatus.mockResolvedValue({
       isVerified: true,
       isSuccess: true,
@@ -143,7 +218,7 @@ describe('PaymentService', () => {
 
     const result = await service.status(student, 'transaction-ref');
 
-    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+    expect(tx.payment.updateMany).toHaveBeenCalledWith({
       where: { id: 'payment-id', status: PaymentStatus.PENDING },
       data: {
         status: PaymentStatus.PAID,
@@ -153,5 +228,154 @@ describe('PaymentService', () => {
       },
     });
     expect(result.status).toBe(PaymentStatus.PAID);
+    expect(result.transactionNo).toBe('12345');
+    expect(result.message).toBe('Giao dịch thành công');
+  });
+
+  it('books one of the listing rooms once the deposit is paid', async () => {
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-id',
+      roomId: room.id,
+      txnRef: 'transaction-ref',
+      studentId: student.id,
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      createdAt: new Date('2026-11-08T10:00:00.000Z'),
+    });
+    vnpay.queryStatus.mockResolvedValue({
+      isVerified: true,
+      isSuccess: true,
+      vnp_TxnRef: 'transaction-ref',
+      vnp_Amount: 300000000,
+      vnp_ResponseCode: '00',
+      vnp_TransactionStatus: '00',
+      vnp_TransactionNo: 12345,
+      vnp_PayDate: 20261108171500,
+    });
+    vnpay.parsePaymentDate.mockReturnValue(new Date('2026-11-08T10:15:00.000Z'));
+
+    await service.status(student, 'transaction-ref');
+
+    expect(tx.room.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: room.id, availableRooms: { gt: 0 } },
+      data: { availableRooms: { decrement: 1 } },
+    });
+    expect(tx.room.updateMany).toHaveBeenNthCalledWith(2, {
+      where: { id: room.id, availableRooms: 0 },
+      data: { status: 'DEPOSITED' },
+    });
+  });
+
+  it('leaves the listing alone when another request already paid the order', async () => {
+    tx.payment.updateMany.mockResolvedValue({ count: 0 });
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-id',
+      roomId: room.id,
+      txnRef: 'transaction-ref',
+      studentId: student.id,
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      createdAt: new Date('2026-11-08T10:00:00.000Z'),
+    });
+    vnpay.queryStatus.mockResolvedValue({
+      isVerified: true,
+      isSuccess: true,
+      vnp_TxnRef: 'transaction-ref',
+      vnp_Amount: 300000000,
+      vnp_ResponseCode: '00',
+      vnp_TransactionStatus: '00',
+      vnp_TransactionNo: 12345,
+      vnp_PayDate: 20261108171500,
+    });
+    vnpay.parsePaymentDate.mockReturnValue(new Date('2026-11-08T10:15:00.000Z'));
+
+    await service.status(student, 'transaction-ref');
+
+    expect(tx.room.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('marks a pending order paid through the dev endpoint', async () => {
+    vnpay.devModeEnabled = true;
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'dev-ref',
+        studentId: student.id,
+        amount: 3000000,
+        status: PaymentStatus.PENDING,
+        transactionNo: null,
+        responseCode: null,
+        payDate: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'dev-ref',
+        studentId: student.id,
+        amount: 3000000,
+        status: PaymentStatus.PAID,
+        transactionNo: 'DEV-dev-ref',
+        responseCode: '00',
+        payDate: new Date('2026-11-08T10:15:00.000Z'),
+      });
+
+    const result = await service.devSucceed(student, 'dev-ref');
+
+    expect(tx.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'payment-id', status: PaymentStatus.PENDING },
+      data: {
+        status: PaymentStatus.PAID,
+        transactionNo: 'DEV-dev-ref',
+        responseCode: '00',
+        payDate: expect.any(Date),
+      },
+    });
+    expect(tx.room.updateMany).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('cancels a pending order when the dev portal reports code 24', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'dev-ref',
+        amount: 3000000,
+        status: PaymentStatus.PENDING,
+        transactionNo: null,
+        responseCode: null,
+        payDate: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'payment-id',
+        roomId: room.id,
+        txnRef: 'dev-ref',
+        amount: 3000000,
+        status: PaymentStatus.CANCELLED,
+        transactionNo: null,
+        responseCode: '24',
+        payDate: null,
+      });
+
+    const result = await service.devReturn('dev-ref', '24');
+
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'payment-id', status: PaymentStatus.PENDING },
+      data: { status: PaymentStatus.CANCELLED, responseCode: '24' },
+    });
+    expect(tx.room.updateMany).not.toHaveBeenCalled();
+    expect(result.status).toBe(PaymentStatus.CANCELLED);
+    expect(result.message).toBe('Mã 24');
+  });
+
+  it('hides the dev endpoint as soon as real credentials exist', async () => {
+    vnpay.devModeEnabled = false;
+
+    await expect(
+      service.devSucceed(student, 'dev-ref'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+    expect(tx.payment.updateMany).not.toHaveBeenCalled();
   });
 });
