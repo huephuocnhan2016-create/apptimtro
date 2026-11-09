@@ -1,13 +1,7 @@
-import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/network/api_error_message.dart';
-import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../rooms/domain/room.dart';
 import '../domain/momo_result_codes.dart';
@@ -15,6 +9,7 @@ import '../domain/payment_order.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'confirm_cancel_deposit.dart';
+import 'payment_controller.dart';
 import 'widgets/gateway_widgets.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -33,246 +28,58 @@ class PaymentScreen extends ConsumerStatefulWidget {
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen>
     with WidgetsBindingObserver {
-  PaymentOrder? _order;
-  PaymentResult? _result;
-  Timer? _timer;
-  String? _error;
-  bool _loading = false;
-  bool _checkingStatus = false;
-  bool _launching = false;
-  bool _cancelling = false;
+  late final PaymentArgs _args = (
+    roomId: widget.room?.id,
+    txnRef: widget.txnRef,
+  );
 
-  /// The portal the student picked. Only used to open an order; once there is
-  /// one, the server's own gateway column is what the screen shows.
-  String _gateway = kDefaultGateway;
+  /// State mới nhất, gán ở đầu [build]; các hàm vẽ bên dưới đọc từ đây.
+  late PaymentState _s;
 
-  /// The demo's debug switch: what the app asked the portal to do and what it
-  /// answered. Only collected in debug builds, and never a secret or a token.
-  final List<String> _debugLog = [];
+  PaymentController get _controller =>
+      ref.read(paymentControllerProvider(_args).notifier);
 
-  void _log(String line) {
-    if (!kDebugMode || !mounted) return;
-    setState(() {
-      _debugLog.insert(0, line);
-      if (_debugLog.length > 6) _debugLog.removeLast();
-    });
-  }
+  /// Viết hoa, như cổng tự ghi tên trên trang thanh toán.
+  String get _portalLabel => _s.isMomo ? 'MOMO' : 'VNPAY';
+
+  /// Tên cổng như người dùng đọc.
+  String get _portalName => portalDisplayName(_s.activeGateway);
+
+  Color get _portalBrand => _s.isMomo ? AppColors.momo : AppColors.brand;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.txnRef != null) {
-      _readExistingOrder();
-    }
   }
-
-  bool get _isMomo => _activeGateway == 'MOMO';
-
-  String get _activeGateway =>
-      _result?.gateway ?? _order?.gateway ?? _gateway;
-
-  /// Upper-case, as the portals write their own names on the checkout page.
-  String get _portalLabel => _isMomo ? 'MOMO' : 'VNPAY';
-
-  /// Brand-cased, for the choices the student reads.
-  String get _portalName => _portalDisplayName(_activeGateway);
-
-  static String _portalDisplayName(String gateway) =>
-      gateway == 'MOMO' ? 'MoMo' : 'VNPay';
-
-  Color get _portalBrand => _isMomo ? AppColors.momo : AppColors.brand;
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // The portal opens in a browser tab, so coming back is the real "I'm done"
-    // signal the app can act on without a deep link handler.
-    if (state == AppLifecycleState.resumed) _checkStatus();
-  }
-
-  Future<void> _createOrder() async {
-    _timer?.cancel();
-    setState(() {
-      _loading = true;
-      _error = null;
-      _order = null;
-      _result = null;
-    });
-    try {
-      final order = await ref
-          .read(paymentApiProvider)
-          .createOrder(widget.room!.id, gateway: _gateway);
-      if (!mounted) return;
-      setState(() {
-        _order = order;
-        _loading = false;
-      });
-      _log(
-        '${order.gateway}: ${order.amount.toInt()} VND, '
-        '${order.deeplink != null ? 'có deep link ví' : 'chỉ link web'}',
-      );
-      if (order.status == 'PENDING') _startPolling();
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = 'Không tạo được yêu cầu đặt cọc: ${apiErrorMessage(error)}';
-      });
-    }
-  }
-
-  // Switching portals means dropping the checkout that was never paid for, so
-  // the student is not left holding an order under the old gateway.
-  void _chooseAnotherGateway() {
-    _timer?.cancel();
-    setState(() {
-      _order = null;
-      _result = null;
-      _error = null;
-      _loading = false;
-    });
-  }
-
-  String? get _activeTxnRef => _order?.txnRef ?? widget.txnRef;
-
-  // Coming back from the portal there is no local order, only the reference the
-  // link carried, so the screen is rebuilt from the server's view of it.
-  Future<void> _readExistingOrder() async {
-    _timer?.cancel();
-    setState(() {
-      _loading = true;
-      _error = null;
-      _result = null;
-    });
-    try {
-      final result = await ref
-          .read(paymentApiProvider)
-          .status(widget.txnRef!);
-      if (!mounted) return;
-      setState(() {
-        _result = result;
-        _loading = false;
-      });
-      if (!result.isSettled) _startPolling();
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = 'Không đọc được đặt cọc: ${apiErrorMessage(error)}';
-      });
-    }
-  }
-
-  void _startPolling() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _checkStatus());
-  }
-
-  Future<void> _openPortal() async {
-    final order = _order;
-    if (order == null || _launching) return;
-    setState(() => _launching = true);
-    // The demo opens MoMo inside the wallet app and only falls back to the web
-    // page, because no test device is guaranteed to have MoMo installed.
-    final links = <(String, String)>[
-      if (_isMomo && order.deeplink != null) (
-        'app $_portalName',
-        order.deeplink!,
-      ),
-      ('trang web', order.payUrl),
-    ];
-    var opened = false;
-    for (final link in links) {
-      opened = await _launch(link.$2);
-      _log('Mở ${link.$1}: ${opened ? 'thành công' : 'không được'}');
-      if (opened) break;
-    }
-    if (!mounted) return;
-    setState(() {
-      _launching = false;
-      if (!opened) _error = 'Không mở được cổng thanh toán $_portalName.';
-    });
-  }
-
-  Future<bool> _launch(String url) async {
-    try {
-      return await launchUrl(
-        Uri.parse(url),
-        // A Chrome custom tab refuses intent:// links to another package, so
-        // the portal's "Về ứng dụng" button only lands in a real browser tab.
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> _checkStatus() async {
-    final txnRef = _activeTxnRef;
-    if (txnRef == null || _checkingStatus) return;
-    if (_result?.isSettled ?? false) return;
-    _checkingStatus = true;
-    try {
-      final result = await ref.read(paymentApiProvider).status(txnRef);
-      if (!mounted) return;
-      setState(() {
-        _result = result;
-        _error = null;
-      });
-      _log(
-        '${result.status}: ${result.responseCode == null ? 'chưa có mã' : 'mã ${result.responseCode}'}'
-        ' — ${result.message}',
-      );
-      if (result.isSettled) _timer?.cancel();
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Không kiểm tra được trạng thái: ${apiErrorMessage(error)}';
-      });
-    } finally {
-      _checkingStatus = false;
-    }
-  }
-
-  bool get _canCancel {
-    if (_activeTxnRef == null) return false;
-    final status = _result?.status;
-    return status == null || status == 'PENDING' || status == 'PAID';
+    // Cổng mở trong tab trình duyệt, nên quay lại app chính là tín hiệu
+    // "tôi xong rồi" mà app bắt được không cần deep link.
+    if (state == AppLifecycleState.resumed) _controller.checkStatus();
   }
 
   Future<void> _cancelDeposit() async {
-    final txnRef = _activeTxnRef;
-    if (txnRef == null || _cancelling) return;
+    if (_s.activeTxnRef == null || _s.cancelling) return;
     final confirmed = await confirmCancelDeposit(context);
     if (!confirmed || !mounted) return;
-    setState(() => _cancelling = true);
-    try {
-      final result = await ref.read(paymentApiProvider).cancel(txnRef);
-      if (!mounted) return;
-      _timer?.cancel();
-      setState(() {
-        _result = result;
-        _error = null;
-        _cancelling = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _cancelling = false;
-        _error = 'Không hủy được đặt cọc: ${apiErrorMessage(error)}';
-      });
-    }
+    await _controller.cancel();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    _s = ref.watch(paymentControllerProvider(_args));
+    return _buildPage();
+  }
+
+  Widget _buildPage() => Scaffold(
     backgroundColor: AppColors.surfaceAlt,
     body: SafeArea(
       child: ListView(
@@ -286,39 +93,39 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               children: [
                 _heroCard(),
                 const SizedBox(height: 16),
-                if (_loading)
+                if (_s.loading)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 48),
                     child: Center(child: CircularProgressIndicator()),
                   )
-                else if (_order == null && widget.txnRef == null)
-                  _error != null ? _errorCard() : _gatewayPicker()
+                else if (_s.order == null && widget.txnRef == null)
+                  _s.error != null ? _errorCard() : _gatewayPicker()
                 else ...[
-                  if (_order != null) _infoCard(_order!) else _referenceCard(),
+                  if (_s.order != null) _infoCard(_s.order!) else _referenceCard(),
                   const SizedBox(height: 16),
-                  if (_order != null && (_result == null || !_result!.isSettled))
+                  if (_s.order != null && (_s.result == null || !_s.result!.isSettled))
                     ...[_payButton(), _gatewaySwitch()],
-                  if (_canCancel) ...[
+                  if (_s.canCancel) ...[
                     const SizedBox(height: 12),
                     _cancelButton(),
                   ],
-                  if (_error != null) ...[
+                  if (_s.error != null) ...[
                     const SizedBox(height: 12),
                     Text(
-                      _error!,
+                      _s.error!,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: AppColors.failure, fontSize: 13),
                     ),
                   ],
-                  if (_result != null) ...[
+                  if (_s.result != null) ...[
                     const SizedBox(height: 16),
-                    _resultCard(_result!),
+                    _resultCard(_s.result!),
                   ],
-                  if (_result == null || !_result!.isSettled) ...[
+                  if (_s.result == null || !_s.result!.isSettled) ...[
                     const SizedBox(height: 16),
                     _pendingNote(),
                   ],
-                  if (_debugLog.isNotEmpty) ...[
+                  if (_s.debugLog.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     _debugCard(),
                   ],
@@ -344,13 +151,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           onPressed: () async {
             if (!mounted) return;
             if (!await Navigator.of(context).maybePop()) {
-              if (mounted) context.go('/splash');
+              if (mounted) context.go('/home');
             }
           },
           icon: const Icon(Icons.chevron_left, color: AppColors.ink),
         ),
         BrandMark(
-          label: _isMomo ? 'M' : 'VN',
+          label: _s.isMomo ? 'M' : 'VN',
           brand: _portalBrand,
         ),
         const SizedBox(width: 10),
@@ -390,7 +197,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   );
 
   bool get _isSandbox {
-    final order = _order;
+    final order = _s.order;
     if (order == null) return false;
     // Both the shared dev checkout page and MoMo's test host stand in for a
     // portal that no real money moves through.
@@ -406,7 +213,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: _isMomo
+        colors: _s.isMomo
             ? const [AppColors.momo, AppColors.momoDark]
             : const [AppColors.brand, AppColors.brandDark],
       ),
@@ -455,13 +262,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_error != null)
-          Text(_error!, style: const TextStyle(color: AppColors.failure, fontSize: 13)),
+        if (_s.error != null)
+          Text(_s.error!, style: const TextStyle(color: AppColors.failure, fontSize: 13)),
         const SizedBox(height: 14),
-        FilledButton(onPressed: _createOrder, child: const Text('Thử lại')),
+        FilledButton(onPressed: _controller.createOrder, child: const Text('Thử lại')),
         const SizedBox(height: 8),
         TextButton(
-          onPressed: _chooseAnotherGateway,
+          onPressed: _controller.chooseAnotherGateway,
           child: const Text('Chọn cổng khác'),
         ),
       ],
@@ -476,26 +283,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       children: [
         GatewayOption(
           value: 'VNPAY',
-          selected: _gateway == 'VNPAY',
+          selected: _s.gateway == 'VNPAY',
           brand: AppColors.brand,
           mark: 'VN',
           name: 'VNPay',
           detail: 'Chuyển khoản ngân hàng, ví VNPay, thẻ nội địa',
-          onSelect: (value) => setState(() => _gateway = value),
+          onSelect: _controller.selectGateway,
         ),
         const SizedBox(height: 10),
         GatewayOption(
           value: 'MOMO',
-          selected: _gateway == 'MOMO',
+          selected: _s.gateway == 'MOMO',
           brand: AppColors.momo,
           mark: 'M',
           name: 'MoMo',
           detail: 'Ví MoMo, QR MoMo, thẻ quốc tế',
-          onSelect: (value) => setState(() => _gateway = value),
+          onSelect: _controller.selectGateway,
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: _createOrder,
+          onPressed: _controller.createOrder,
           style: FilledButton.styleFrom(
             backgroundColor: _portalBrand,
             foregroundColor: Colors.white,
@@ -515,7 +322,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _gatewaySwitch() => Padding(
     padding: const EdgeInsets.only(top: 8),
     child: TextButton.icon(
-      onPressed: _chooseAnotherGateway,
+      onPressed: _controller.chooseAnotherGateway,
       style: TextButton.styleFrom(
         foregroundColor: AppColors.muted,
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -573,11 +380,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           ),
         ),
         const SizedBox(height: 12),
-        if (_isMomo && order.qrCodeUrl != null) ...[
+        if (_s.isMomo && order.qrCodeUrl != null) ...[
           _qrPanel(order.qrCodeUrl!),
           const SizedBox(height: 12),
         ],
-        if (_isMomo)
+        if (_s.isMomo)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
@@ -695,7 +502,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   );
 
   Widget _payButton() => FilledButton.icon(
-    onPressed: _launching ? null : _openPortal,
+    onPressed: _s.launching ? null : _controller.openPortal,
     style: FilledButton.styleFrom(
       backgroundColor: _portalBrand,
       foregroundColor: Colors.white,
@@ -703,7 +510,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
-    icon: _launching
+    icon: _s.launching
         ? const SizedBox(
             width: 18,
             height: 18,
@@ -713,11 +520,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             ),
           )
         : const Icon(Icons.credit_card),
-    label: Text(_launching ? 'Đang mở cổng thanh toán...' : 'Thanh toán ngay'),
+    label: Text(_s.launching ? 'Đang mở cổng thanh toán...' : 'Thanh toán ngay'),
   );
 
   Widget _cancelButton() => OutlinedButton.icon(
-    onPressed: _cancelling ? null : _cancelDeposit,
+    onPressed: _s.cancelling ? null : _cancelDeposit,
     style: OutlinedButton.styleFrom(
       foregroundColor: AppColors.failure,
       side: const BorderSide(color: AppColors.failure, width: 1),
@@ -725,7 +532,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
-    icon: _cancelling
+    icon: _s.cancelling
         ? const SizedBox(
             width: 16,
             height: 16,
@@ -735,7 +542,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             ),
           )
         : const Icon(Icons.close),
-    label: Text(_cancelling ? 'Đang hủy cọc...' : 'Hủy cọc'),
+    label: Text(_s.cancelling ? 'Đang hủy cọc...' : 'Hủy cọc'),
   );
 
   Widget _resultCard(PaymentResult result) {
@@ -790,7 +597,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           DetailRow(label: 'Ngân hàng', value: result.bankName),
           if (result.transactionNo != null)
             DetailRow(
-              label: 'Mã giao dịch ${_portalDisplayName(result.gateway)}',
+              label: 'Mã giao dịch ${portalDisplayName(result.gateway)}',
               value: result.transactionNo!,
             ),
           if (result.payDate != null)
@@ -836,7 +643,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       Expanded(
         child: Text(
           'Ứng dụng không chứa khóa bí mật. Đường dẫn thanh toán được máy chủ '
-          'ký HMAC-${_isMomo ? 'SHA256' : 'SHA512'} và trả về cho app.',
+          'ký HMAC-${_s.isMomo ? 'SHA256' : 'SHA512'} và trả về cho app.',
           style: const TextStyle(color: AppColors.muted, fontSize: 11, height: 1.4),
         ),
       ),
@@ -863,7 +670,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final line in _debugLog)
+        for (final line in _s.debugLog)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Text(
