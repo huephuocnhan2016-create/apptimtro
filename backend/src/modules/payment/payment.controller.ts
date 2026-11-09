@@ -94,6 +94,14 @@ export class PaymentController {
     return this.payment.cancel(user, txnRef);
   }
 
+  @Get('deposits')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'List the rooms the student is holding deposits on' })
+  deposits(@CurrentUser() user: User) {
+    return this.payment.deposits(user);
+  }
+
   // VNPay sends the browser here with the signed result query. Public by
   // design: the checksum, not the session, is what authorises this request.
   @Get('vnpay/return')

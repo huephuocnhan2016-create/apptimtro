@@ -59,4 +59,24 @@ void main() {
     expect(room.latitude, isNull);
     expect(room.longitude, isNull);
   });
+
+  test('reads the deposit the student already holds on a room', () {
+    Room withDeposit(bool held) => Room.fromJson({
+      'id': 'room-1',
+      'title': 'Phòng gần trường',
+      'address': 'Quận 1',
+      'price': 4500000,
+      'area': 22.5,
+      'totalRooms': 4,
+      'availableRooms': 2,
+      'electricityPrice': 3000,
+      'waterPrice': 12000,
+      'internetPrice': 100000,
+      'deposit': 4500000,
+      'hasDeposit': held,
+    });
+
+    expect(withDeposit(true).hasDeposit, isTrue);
+    expect(withDeposit(false).hasDeposit, isFalse);
+  });
 }

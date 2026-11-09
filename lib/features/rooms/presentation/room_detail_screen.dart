@@ -247,12 +247,16 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     label: Text(_favorite ? 'Đã yêu thích' : 'Yêu thích'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: room.status == 'DEPOSITED'
+                    onPressed: room.hasDeposit || room.status == 'DEPOSITED'
                         ? null
                         : () => context.push('/payment', extra: room),
                     icon: const Icon(Icons.account_balance_wallet_outlined),
                     label: Text(
-                      room.status == 'DEPOSITED' ? 'Hết chỗ cọc' : 'Đặt cọc',
+                      room.hasDeposit
+                          ? 'Bạn đã cọc'
+                          : room.status == 'DEPOSITED'
+                          ? 'Hết chỗ cọc'
+                          : 'Đặt cọc',
                     ),
                   ),
                 ],

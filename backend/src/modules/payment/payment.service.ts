@@ -5,7 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PaymentStatus, RoomStatus, User, UserRole } from '@prisma/client';
+import {
+  Prisma,
+  PaymentStatus,
+  RoomStatus,
+  User,
+  UserRole,
+} from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import type { ReturnQueryFromVNPay } from 'vnpay';
 import { PrismaService } from '../../database/prisma.service';
@@ -43,6 +49,14 @@ export class PaymentService {
       throw new ConflictException(
         'This room is no longer open for a deposit.',
       );
+    }
+    const alreadyHeld = await this.holdsDeposit({
+      client: this.prisma,
+      studentId: user.id,
+      roomId: room.id,
+    });
+    if (alreadyHeld) {
+      throw new ConflictException('Bạn đã đặt cọc phòng này rồi.');
     }
 
     const amount = Math.round(Number(room.deposit));
@@ -108,6 +122,43 @@ export class PaymentService {
       await this.markCancelled(payment, payment.status);
     }
     return this.reload(txnRef);
+  }
+
+  // The deposits a student is currently holding, newest first. Only paid
+  // orders count: a pending checkout has not booked a room yet.
+  async deposits(user: User) {
+    if (user.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('Only students can list deposit orders.');
+    }
+    const payments = await this.prisma.payment.findMany({
+      where: { studentId: user.id, status: PaymentStatus.PAID },
+      orderBy: { payDate: 'desc' },
+      include: {
+        room: {
+          select: {
+            id: true,
+            title: true,
+            address: true,
+            price: true,
+            deposit: true,
+            images: { select: { imageUrl: true }, take: 1 },
+          },
+        },
+      },
+    });
+    return payments.map((payment) => ({
+      txnRef: payment.txnRef,
+      amount: Math.round(Number(payment.amount)),
+      payDate: payment.payDate,
+      room: {
+        id: payment.room.id,
+        title: payment.room.title,
+        address: payment.room.address,
+        price: Number(payment.room.price),
+        deposit: Number(payment.room.deposit),
+        image: payment.room.images[0]?.imageUrl ?? null,
+      },
+    }));
   }
 
   async devSucceed(user: User, txnRef: string) {
@@ -187,7 +238,7 @@ export class PaymentService {
   }
 
   private async close(
-    payment: { id: string; roomId: string; txnRef: string },
+    payment: { id: string; roomId: string; studentId: string; txnRef: string },
     responseCode: string,
   ) {
     if (responseCode !== '00') {
@@ -201,13 +252,47 @@ export class PaymentService {
     });
   }
 
+  private async holdsDeposit(options: {
+    client: Prisma.TransactionClient;
+    studentId: string;
+    roomId: string;
+    exceptPaymentId?: string;
+  }) {
+    const { client, studentId, roomId, exceptPaymentId } = options;
+    const held = await client.payment.findFirst({
+      where: {
+        studentId,
+        roomId,
+        status: PaymentStatus.PAID,
+        ...(exceptPaymentId ? { id: { not: exceptPaymentId } } : {}),
+      },
+      select: { id: true },
+    });
+    return Boolean(held);
+  }
+
   // A paid deposit books one of the listing's rooms, and a listing emptied by
-  // deposits reads as deposited rather than merely full.
+  // deposits reads as deposited rather than merely full. Two orders for the
+  // same room can both reach the gate, so only the first one may book.
   private async markPaid(
-    payment: { id: string; roomId: string },
+    payment: { id: string; roomId: string; studentId: string },
     data: { transactionNo: string; responseCode: string; payDate: Date },
   ) {
     await this.prisma.$transaction(async (tx) => {
+      if (
+        await this.holdsDeposit({
+          client: tx,
+          studentId: payment.studentId,
+          roomId: payment.roomId,
+          exceptPaymentId: payment.id,
+        })
+      ) {
+        await tx.payment.updateMany({
+          where: { id: payment.id, status: PaymentStatus.PENDING },
+          data: { status: PaymentStatus.FAILED, responseCode: '97' },
+        });
+        return;
+      }
       const flipped = await tx.payment.updateMany({
         where: { id: payment.id, status: PaymentStatus.PENDING },
         data: { status: PaymentStatus.PAID, ...data },
@@ -264,7 +349,8 @@ export class PaymentService {
     });
   }
 
-  async status(user: User, txnRef: string) {    const payment = await this.prisma.payment.findFirst({
+  async status(user: User, txnRef: string) {
+    const payment = await this.prisma.payment.findFirst({
       where: { txnRef, studentId: user.id },
     });
     if (!payment) throw new NotFoundException('Payment order not found.');

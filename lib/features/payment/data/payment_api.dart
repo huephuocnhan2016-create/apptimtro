@@ -39,4 +39,14 @@ class PaymentApi {
     }
     return PaymentResult.fromJson(data);
   }
+
+  Future<List<RoomDeposit>> deposits() async {
+    final response = await _client.dio.get<List<dynamic>>(
+      '/payment/deposits',
+    );
+    return (response.data ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(RoomDeposit.fromJson)
+        .toList();
+  }
 }

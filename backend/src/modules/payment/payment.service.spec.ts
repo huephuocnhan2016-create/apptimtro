@@ -24,7 +24,7 @@ const room = {
 
 describe('PaymentService', () => {
   const tx = {
-    payment: { updateMany: jest.fn() },
+    payment: { findFirst: jest.fn(), updateMany: jest.fn() },
     room: { updateMany: jest.fn() },
   };
   const prisma = {
@@ -35,6 +35,7 @@ describe('PaymentService', () => {
     payment: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -55,6 +56,8 @@ describe('PaymentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.payment.findFirst.mockResolvedValue(null);
+    tx.payment.findFirst.mockResolvedValue(null);
     tx.payment.updateMany.mockResolvedValue({ count: 1 });
     tx.room.updateMany.mockResolvedValue({ count: 1 });
   });
@@ -110,6 +113,24 @@ describe('PaymentService', () => {
     await expect(
       service.create(student, { roomId: room.id }, '127.0.0.1'),
     ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a second deposit on a room the student already holds', async () => {
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.findFirst.mockResolvedValue({ id: 'already-paid' });
+
+    await expect(
+      service.create(student, { roomId: room.id }, '127.0.0.1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.payment.findFirst).toHaveBeenCalledWith({
+      where: {
+        studentId: student.id,
+        roomId: room.id,
+        status: PaymentStatus.PAID,
+      },
+      select: { id: true },
+    });
     expect(prisma.payment.create).not.toHaveBeenCalled();
   });
 
@@ -265,6 +286,47 @@ describe('PaymentService', () => {
       where: { id: room.id, availableRooms: 0 },
       data: { status: 'DEPOSITED' },
     });
+  });
+
+  it('fails a second paid order for the same room instead of booking twice', async () => {
+    tx.payment.findFirst.mockResolvedValue({ id: 'other-paid' });
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-id',
+      roomId: room.id,
+      txnRef: 'transaction-ref',
+      studentId: student.id,
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      createdAt: new Date('2026-11-08T10:00:00.000Z'),
+    });
+    vnpay.queryStatus.mockResolvedValue({
+      isVerified: true,
+      isSuccess: true,
+      vnp_TxnRef: 'transaction-ref',
+      vnp_Amount: 300000000,
+      vnp_ResponseCode: '00',
+      vnp_TransactionStatus: '00',
+      vnp_TransactionNo: 12345,
+      vnp_PayDate: 20261108171500,
+    });
+    vnpay.parsePaymentDate.mockReturnValue(new Date('2026-11-08T10:15:00.000Z'));
+
+    await service.status(student, 'transaction-ref');
+
+    expect(tx.payment.findFirst).toHaveBeenCalledWith({
+      where: {
+        studentId: student.id,
+        roomId: room.id,
+        status: PaymentStatus.PAID,
+        id: { not: 'payment-id' },
+      },
+      select: { id: true },
+    });
+    expect(tx.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'payment-id', status: PaymentStatus.PENDING },
+      data: { status: PaymentStatus.FAILED, responseCode: '97' },
+    });
+    expect(tx.room.updateMany).not.toHaveBeenCalled();
   });
 
   it('leaves the listing alone when another request already paid the order', async () => {
@@ -485,5 +547,64 @@ describe('PaymentService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.payment.findFirst).not.toHaveBeenCalled();
     expect(tx.payment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('lists only the paid deposits with their room summary', async () => {
+    prisma.payment.findMany.mockResolvedValue([
+      {
+        txnRef: 'paid-ref',
+        amount: { toString: () => '3000000.00' },
+        payDate: new Date('2026-11-09T06:00:00.000Z'),
+        room: {
+          id: room.id,
+          title: 'Phong tro Xuyen Moc',
+          address: 'Xa Xuyen Moc',
+          price: { toString: () => '2000000.00' },
+          deposit: { toString: () => '4000000.00' },
+          images: [{ imageUrl: 'https://cdn/room.jpg' }],
+        },
+      },
+    ]);
+
+    const result = await service.deposits(student);
+
+    expect(prisma.payment.findMany).toHaveBeenCalledWith({
+      where: { studentId: student.id, status: PaymentStatus.PAID },
+      orderBy: { payDate: 'desc' },
+      include: {
+        room: {
+          select: {
+            id: true,
+            title: true,
+            address: true,
+            price: true,
+            deposit: true,
+            images: { select: { imageUrl: true }, take: 1 },
+          },
+        },
+      },
+    });
+    expect(result).toEqual([
+      {
+        txnRef: 'paid-ref',
+        amount: 3000000,
+        payDate: new Date('2026-11-09T06:00:00.000Z'),
+        room: {
+          id: room.id,
+          title: 'Phong tro Xuyen Moc',
+          address: 'Xa Xuyen Moc',
+          price: 2000000,
+          deposit: 4000000,
+          image: 'https://cdn/room.jpg',
+        },
+      },
+    ]);
+  });
+
+  it('keeps landlords out of the deposit list', async () => {
+    await expect(
+      service.deposits({ id: 'landlord-id', role: UserRole.LANDLORD } as User),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.payment.findMany).not.toHaveBeenCalled();
   });
 });
