@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/user.dart';
@@ -17,21 +18,46 @@ import '../../features/rooms/presentation/room_form.dart';
 import '../../features/rooms/presentation/room_search_screen.dart';
 import '../../features/landlord/presentation/landlord_screens.dart';
 import '../../features/favorites/presentation/favorites_screen.dart';
+import '../providers.dart';
+import 'app_shell.dart';
+import 'auth_redirect.dart';
+import 'route_error_screen.dart';
 
-final appRouter = GoRouter(
-  initialLocation: '/splash',
-  redirect: (context, state) {
-    // The portal's "Về ứng dụng" link carries only a transaction reference;
-    // go_router has no custom-scheme support, so re-read that order instead of
-    // dumping the shopper back on the splash screen.
-    if (state.uri.scheme == 'trotot') {
-      final txnRef = state.uri.queryParameters['txnRef'];
-      return txnRef == null ? '/splash' : '/payment?txnRef=$txnRef';
-    }
-    return null;
-  },
-  routes: [
-    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
+/// Router của app. Nghe [currentUserProvider] và [sessionRestoredProvider]:
+/// đăng nhập/đăng xuất là router tự chạy lại [authRedirect].
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final refresh = ValueNotifier<int>(0);
+  ref.listen(currentUserProvider, (_, _) => refresh.value++);
+  ref.listen(sessionRestoredProvider, (_, _) => refresh.value++);
+
+  final router = GoRouter(
+    initialLocation: '/splash',
+    refreshListenable: refresh,
+    // Link "Về ứng dụng" của cổng thanh toán (trotot://...?txnRef=) được
+    // chuyển thành /payment?txnRef= — nhưng chỉ sau khi đã kiểm tra đăng nhập.
+    redirect: (context, state) => authRedirect(
+      uri: state.uri,
+      matchedLocation: state.matchedLocation,
+      sessionRestored: ref.read(sessionRestoredProvider),
+      loggedIn: ref.read(currentUserProvider) != null,
+    ),
+    errorBuilder: (_, _) =>
+        const RouteErrorScreen(message: 'Không tìm thấy trang này.'),
+    routes: _routes,
+  );
+  ref.onDispose(() {
+    router.dispose();
+    refresh.dispose();
+  });
+  return router;
+});
+
+final _routes = <RouteBase>[
+    GoRoute(
+      path: '/splash',
+      builder: (_, state) =>
+          SplashScreen(from: state.uri.queryParameters['from']),
+    ),
     GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
     GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
     GoRoute(
@@ -98,19 +124,42 @@ final appRouter = GoRouter(
         );
       },
     ),
-    GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
-    GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
-    GoRoute(path: '/map', builder: (_, _) => const MapScreen()),
+    // 4 tab chính dùng chung một thanh điều hướng; mỗi tab giữ lịch sử riêng.
+    StatefulShellRoute.indexedStack(
+      builder: (_, _, shell) => AppShell(shell: shell),
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/map', builder: (_, _) => const MapScreen())],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/favorites',
+              builder: (_, _) => const FavoritesScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
+          ],
+        ),
+      ],
+    ),
     GoRoute(path: '/map-picker', builder: (_, _) => const MapPickerScreen()),
-    GoRoute(path: '/favorites', builder: (_, _) => const FavoritesScreen()),
     GoRoute(path: '/chats', builder: (_, _) => const ChatListScreen()),
     GoRoute(
       path: '/chats/thread',
       builder: (_, state) {
         final conversation = state.extra;
         if (conversation is! ChatConversation) {
-          return const Scaffold(
-            body: Center(child: Text('Không xác định được cuộc trò chuyện.')),
+          return const RouteErrorScreen(
+            message: 'Không xác định được cuộc trò chuyện.',
           );
         }
         return ChatScreen.withConversation(
@@ -132,8 +181,8 @@ final appRouter = GoRouter(
       builder: (_, state) {
         final room = state.extra;
         if (room is! Room) {
-          return const Scaffold(
-            body: Center(child: Text('Không xác định được chủ trọ để chat.')),
+          return const RouteErrorScreen(
+            message: 'Không xác định được chủ trọ để chat.',
           );
         }
         return ChatScreen(room: room);
@@ -146,10 +195,8 @@ final appRouter = GoRouter(
         if (txnRef != null) return PaymentScreen(txnRef: txnRef);
         final room = state.extra;
         if (room is! Room) {
-          return const Scaffold(
-            body: Center(
-              child: Text('Không xác định được phòng để đặt cọc.'),
-            ),
+          return const RouteErrorScreen(
+            message: 'Không xác định được phòng để đặt cọc.',
           );
         }
         return PaymentScreen(room: room);
@@ -174,8 +221,10 @@ final appRouter = GoRouter(
         final room = state.extra;
         return room is Room
             ? EditRoomScreen(room: room)
-            : const AddRoomScreen();
+            : const RouteErrorScreen(
+                message: 'Không xác định được phòng cần sửa. '
+                    'Hãy mở lại từ danh sách phòng của bạn.',
+              );
       },
     ),
-  ],
-);
+];
