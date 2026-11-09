@@ -37,31 +37,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         ),
       ],
     ),
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: 2,
-      onDestinationSelected: (index) {
-        if (index == 0) context.go('/home');
-        if (index == 1) context.go('/map');
-        if (index == 3) context.go('/profile');
-      },
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: 'Trang chủ',
-        ),
-        NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Bản đồ'),
-        NavigationDestination(
-          icon: Icon(Icons.favorite_border),
-          selectedIcon: Icon(Icons.favorite),
-          label: 'Yêu thích',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          label: 'Cá nhân',
-        ),
-      ],
-    ),
     body: FutureBuilder<List<Room>>(
       future: _favorites,
       builder: (context, snapshot) => AsyncStateView<List<Room>>(

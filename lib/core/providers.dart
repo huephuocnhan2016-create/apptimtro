@@ -44,6 +44,18 @@ class UserNotifier extends Notifier<AppUser?> {
   void clearUser() => state = null;
 }
 
+/// `true` khi splash đã đọc xong phiên đăng nhập cũ. Router dựa vào cờ này để
+/// không đẩy nhầm người đã đăng nhập về login lúc app vừa mở.
+final sessionRestoredProvider =
+    NotifierProvider<SessionRestoredNotifier, bool>(SessionRestoredNotifier.new);
+
+class SessionRestoredNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void markRestored() => state = true;
+}
+
 final roomApiProvider = Provider(
   (ref) => RoomApi(ref.watch(apiClientProvider)),
 );

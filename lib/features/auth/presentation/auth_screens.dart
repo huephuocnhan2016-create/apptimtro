@@ -11,7 +11,11 @@ import '../domain/user.dart';
 import '../../../shared/widgets/app_button.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({this.from, super.key});
+
+  /// Đường dẫn người dùng định mở trước khi bị đưa qua splash (vd. deep link).
+  final String? from;
+
   @override
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
@@ -23,8 +27,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final user = await ref.read(authRepositoryProvider).restoreSession();
       if (!mounted) return;
-      ref.read(currentUserProvider.notifier).state = user;
-      context.go(user == null ? '/welcome' : '/home');
+      ref.read(currentUserProvider.notifier).setUser(user);
+      ref.read(sessionRestoredProvider.notifier).markRestored();
+      final from = widget.from;
+      // Router sẽ tự đưa về /login nếu `from` cần đăng nhập mà chưa có user.
+      if (from != null && from.startsWith('/') && !from.startsWith('/splash')) {
+        context.go(from);
+      } else {
+        context.go(user == null ? '/welcome' : '/home');
+      }
     });
   }
 
@@ -260,7 +271,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           phone: widget.phone,
           verificationToken: verificationToken,
         );
-        ref.read(currentUserProvider.notifier).state = user;
+        ref.read(currentUserProvider.notifier).setUser(user);
         if (mounted) context.go('/home');
       } else if (mounted) {
         final role = widget.role == UserRole.landlord ? 'landlord' : 'student';
@@ -349,7 +360,7 @@ class _StudentRegisterScreenState extends ConsumerState<StudentRegisterScreen> {
             role: UserRole.student,
             fullName: _name.text.trim(),
           );
-      ref.read(currentUserProvider.notifier).state = user;
+      ref.read(currentUserProvider.notifier).setUser(user);
       if (mounted) context.go('/home');
     } on DioException catch (error) {
       if (mounted) {
@@ -423,7 +434,7 @@ class _LandlordRegisterScreenState
             fullName: _name.text.trim(),
             email: _email.text.trim(),
           );
-      ref.read(currentUserProvider.notifier).state = user;
+      ref.read(currentUserProvider.notifier).setUser(user);
       if (mounted) context.go('/home');
     } on DioException catch (error) {
       if (mounted) {

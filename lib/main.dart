@@ -16,14 +16,14 @@ void main() async {
   runApp(const ProviderScope(child: TroTotApp()));
 }
 
-class TroTotApp extends StatelessWidget {
+class TroTotApp extends ConsumerWidget {
   const TroTotApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp.router(
+  Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
     title: AppConstants.appName,
     theme: AppTheme.light,
-    routerConfig: appRouter,
+    routerConfig: ref.watch(appRouterProvider),
     debugShowCheckedModeBanner: false,
   );
 }
