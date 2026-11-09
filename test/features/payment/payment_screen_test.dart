@@ -34,6 +34,18 @@ class _FakePaymentApi implements PaymentApi {
         payDate: null,
         message: 'Giao dịch chưa hoàn tất',
       );
+
+  @override
+  Future<PaymentResult> cancel(String txnRef) async => const PaymentResult(
+    status: 'CANCELLED',
+    txnRef: '20261109ABCD',
+    amount: 1400000,
+    bankName: 'VNPAY',
+    transactionNo: null,
+    responseCode: '24',
+    payDate: null,
+    message: 'Giao dịch không thành công do: Khách hàng hủy giao dịch',
+  );
 }
 
 Room get _room => const Room(
@@ -54,12 +66,27 @@ Room get _room => const Room(
   status: 'AVAILABLE',
 );
 
-Future<void> _pump(WidgetTester tester, PaymentApi api) => tester.pumpWidget(
-  ProviderScope(
-    overrides: [paymentApiProvider.overrideWithValue(api)],
-    child: MaterialApp(theme: ThemeData.light(), home: PaymentScreen(room: _room)),
-  ),
-);
+Future<void> _pump(
+  WidgetTester tester,
+  PaymentApi api, {
+  String? txnRef,
+}) async {
+  // A phone-width surface: the demo card overflows at the 800x600 test size.
+  tester.view.devicePixelRatio = 3;
+  tester.view.physicalSize = const Size(1080, 2400);
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [paymentApiProvider.overrideWithValue(api)],
+      child: MaterialApp(
+        theme: ThemeData.light(),
+        home: txnRef == null
+            ? PaymentScreen(room: _room)
+            : PaymentScreen(txnRef: txnRef),
+      ),
+    ),
+  );
+}
 
 void main() {
   testWidgets('shows the portal checkout card before paying', (tester) async {
@@ -76,7 +103,9 @@ void main() {
     expect(find.byIcon(Icons.qr_code), findsNothing);
   });
 
-  testWidgets('renders the VNPay result once the order is paid', (tester) async {
+  testWidgets('renders the VNPay result once the order is paid', (
+    tester,
+  ) async {
     await _pump(
       tester,
       _FakePaymentApi(
@@ -102,5 +131,56 @@ void main() {
     expect(find.text('12345'), findsOne);
     expect(find.text('09/11/2026 10:27:08'), findsOne);
     expect(find.text('Thanh toán ngay'), findsNothing);
+  });
+
+  testWidgets('cancels the deposit after the confirm dialog', (tester) async {
+    await _pump(tester, _FakePaymentApi());
+    await tester.pumpAndSettle();
+
+    final cancel = find.widgetWithText(OutlinedButton, 'Hủy cọc');
+    await tester.drag(find.byType(ListView), const Offset(0, -1200));
+    await tester.pumpAndSettle();
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
+    expect(find.text('Hủy đặt cọc?'), findsOne);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Hủy cọc'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, 1200));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Trạng thái giao dịch'), findsOne);
+    expect(find.text('Mã 24'), findsOne);
+    expect(find.text('Hủy cọc'), findsNothing);
+    expect(find.text('Thanh toán ngay'), findsNothing);
+  });
+
+  testWidgets('re-reads the order when the portal hands the app back', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakePaymentApi(
+        result: const PaymentResult(
+          status: 'PAID',
+          txnRef: '20261109ABCD',
+          amount: 1400000,
+          bankName: 'VNPAY',
+          transactionNo: '12345',
+          responseCode: '00',
+          payDate: '20261109102708',
+          message: 'Giao dịch thành công',
+        ),
+      ),
+      txnRef: '20261109ABCD',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mã tham chiếu'), findsOne);
+    expect(find.text('Trạng thái giao dịch'), findsOne);
+    expect(find.text('Giao dịch thành công'), findsOne);
+    expect(find.text('Mã 00'), findsOne);
+    expect(find.text('Thanh toán ngay'), findsNothing);
+    expect(find.text('Phòng trọ Minh Thạnh'), findsNothing);
   });
 }
