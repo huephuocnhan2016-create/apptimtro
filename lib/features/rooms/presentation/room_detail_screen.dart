@@ -102,6 +102,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               ),
               const SizedBox(height: 8),
               Text(room.address),
+              if (room.status == 'DEPOSITED') ...[
+                const SizedBox(height: 8),
+                Chip(
+                  label: const Text('Đang cọc'),
+                  backgroundColor:
+                      Theme.of(context).colorScheme.secondaryContainer,
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
                 '${room.price.toStringAsFixed(0)} đ/tháng',
@@ -239,9 +247,13 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     label: Text(_favorite ? 'Đã yêu thích' : 'Yêu thích'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => context.push('/payment', extra: room),
-                    icon: const Icon(Icons.credit_card),
-                    label: const Text('Thanh toán'),
+                    onPressed: room.status == 'DEPOSITED'
+                        ? null
+                        : () => context.push('/payment', extra: room),
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    label: Text(
+                      room.status == 'DEPOSITED' ? 'Hết chỗ cọc' : 'Đặt cọc',
+                    ),
                   ),
                 ],
               ),

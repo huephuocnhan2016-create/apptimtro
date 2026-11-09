@@ -135,7 +135,7 @@ final appRouter = GoRouter(
         if (room is! Room) {
           return const Scaffold(
             body: Center(
-              child: Text('Không xác định được phòng để thanh toán.'),
+              child: Text('Không xác định được phòng để đặt cọc.'),
             ),
           );
         }

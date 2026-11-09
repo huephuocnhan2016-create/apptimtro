@@ -108,7 +108,7 @@ export class RoomsService {
         ...coordinates,
         totalRooms,
         availableRooms,
-        status: this.statusFor(availableRooms),
+        status: this.statusFor(availableRooms, current.status),
       },
       include: roomIncludes,
     }));
@@ -129,7 +129,7 @@ export class RoomsService {
       where: { id },
       data: {
         availableRooms: dto.availableRooms,
-        status: this.statusFor(dto.availableRooms),
+        status: this.statusFor(dto.availableRooms, current.status),
       },
       include: roomIncludes,
     }));
@@ -198,7 +198,7 @@ export class RoomsService {
 
   async addFavorite(user: User, roomId: string) {
     const room = await this.prisma.room.findFirst({
-      where: { id: roomId, status: { in: [RoomStatus.AVAILABLE, RoomStatus.FULL] } },
+      where: { id: roomId, status: { in: [RoomStatus.AVAILABLE, RoomStatus.FULL, RoomStatus.DEPOSITED] } },
     });
     if (!room) throw new NotFoundException('Room not found.');
     await this.prisma.favorite.upsert({
@@ -220,8 +220,13 @@ export class RoomsService {
       include: { room: { include: roomIncludes } },
       orderBy: { createdAt: 'desc' },
     });
+    const visible: RoomStatus[] = [
+      RoomStatus.AVAILABLE,
+      RoomStatus.FULL,
+      RoomStatus.DEPOSITED,
+    ];
     return favorites
-      .filter(({ room }) => room.status === RoomStatus.AVAILABLE || room.status === RoomStatus.FULL)
+      .filter(({ room }) => visible.includes(room.status))
       .map(({ room }) => this.serialize(room));
   }
 
@@ -235,7 +240,7 @@ export class RoomsService {
       throw new BadRequestException('minArea cannot be greater than maxArea.');
     }
     const filters = [
-      Prisma.sql`"status" = 'AVAILABLE'`,
+      Prisma.sql`"status" IN ('AVAILABLE', 'DEPOSITED')`,
       dto.query ? Prisma.sql`("title" ILIKE ${`%${dto.query}%`} OR "description" ILIKE ${`%${dto.query}%`} OR "address" ILIKE ${`%${dto.query}%`})` : Prisma.empty,
       dto.minPrice !== undefined ? Prisma.sql`"price" >= ${dto.minPrice}` : Prisma.empty,
       dto.maxPrice !== undefined ? Prisma.sql`"price" <= ${dto.maxPrice}` : Prisma.empty,
@@ -328,8 +333,12 @@ export class RoomsService {
     }
   }
 
-  private statusFor(available: number) {
-    return available === 0 ? RoomStatus.FULL : RoomStatus.AVAILABLE;
+  private statusFor(available: number, current?: RoomStatus) {
+    if (available > 0) return RoomStatus.AVAILABLE;
+    // Deposits, not the landlord, emptied the listing — keep that reason visible.
+    return current === RoomStatus.DEPOSITED
+      ? RoomStatus.DEPOSITED
+      : RoomStatus.FULL;
   }
 
   private isSupportedImage(file: RoomImageUpload) {
