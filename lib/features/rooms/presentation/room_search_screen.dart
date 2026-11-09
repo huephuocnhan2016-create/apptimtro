@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,7 +17,11 @@ class RoomSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
+  /// Gõ xong 350ms mới tìm, để gõ nhanh 10 ký tự chỉ tốn 1–2 request.
+  static const _debounce = Duration(milliseconds: 350);
+
   final _query = TextEditingController();
+  Timer? _typing;
   late Future<List<Room>> _rooms;
   Map<String, Object?> _filters = {};
 
@@ -27,16 +33,26 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
 
   @override
   void dispose() {
+    _typing?.cancel();
     _query.dispose();
     super.dispose();
   }
 
-  void _search() => setState(() {
-    _rooms = ref.read(roomRepositoryProvider).search({
+  void _onTyping(String _) {
+    _typing?.cancel();
+    _typing = Timer(_debounce, _search);
+  }
+
+  void _search() {
+    _typing?.cancel();
+    if (!mounted) return;
+    setState(() => _rooms = _fetch());
+  }
+
+  Future<List<Room>> _fetch() => ref.read(roomRepositoryProvider).search({
       if (_query.text.trim().isNotEmpty) 'query': _query.text.trim(),
       ..._filters,
     });
-  });
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -51,6 +67,7 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
                 child: TextField(
                   controller: _query,
                   textInputAction: TextInputAction.search,
+                  onChanged: _onTyping,
                   onSubmitted: (_) => _search(),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
@@ -78,9 +95,18 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
               onRetry: _search,
               emptyMessage: 'Không tìm thấy phòng phù hợp.',
               emptyIcon: Icons.search_off,
-              builder: (context, rooms) => ListView.builder(
-                itemCount: rooms.length,
-                itemBuilder: (context, index) => RoomCard(room: rooms[index]),
+              builder: (context, rooms) => RefreshIndicator(
+                onRefresh: () async {
+                  _search();
+                  // Lỗi đã hiện trong danh sách, không ném tiếp ra RefreshIndicator.
+                  await _rooms.then((_) {}, onError: (Object _) {});
+                },
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: rooms.length,
+                  itemBuilder: (context, index) =>
+                      RoomCard(room: rooms[index]),
+                ),
               ),
             ),
           ),

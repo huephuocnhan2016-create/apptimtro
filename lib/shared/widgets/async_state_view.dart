@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_error_message.dart';
 import '../../core/theme/app_theme.dart';
@@ -18,6 +19,22 @@ class AsyncStateView<T> extends StatelessWidget {
   });
 
   final AsyncSnapshot<T> snapshot;
+
+  /// Đổi `AsyncValue` (Riverpod) sang `AsyncSnapshot` để dùng chung widget này.
+  /// Đang tải lại mà đã có dữ liệu cũ thì vẫn hiện dữ liệu cũ.
+  static AsyncSnapshot<V> snapshotOf<V>(AsyncValue<V> value) {
+    if (value.hasError) {
+      return AsyncSnapshot.withError(
+        ConnectionState.done,
+        value.error!,
+        value.stackTrace ?? StackTrace.empty,
+      );
+    }
+    if (value.hasValue) {
+      return AsyncSnapshot.withData(ConnectionState.done, value.requireValue);
+    }
+    return const AsyncSnapshot.waiting();
+  }
   final Widget Function(BuildContext context, T data) builder;
 
   /// Ví dụ `Không tải được phòng` → hiện `Không tải được phòng: (lý do)`.
