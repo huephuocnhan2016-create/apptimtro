@@ -56,6 +56,19 @@ class PaymentOrder {
 String? optionalLink(Object? value) =>
     value is String && value.isNotEmpty ? value : null;
 
+/// Ngày giờ thanh toán cổng trả về dạng `yyyyMMddHHmmss` (VNPay và MoMo đều
+/// dùng) → `dd/MM/yyyy HH:mm:ss`. Chuỗi khác dạng thì giữ nguyên.
+String formatGatewayPayDate(String value) {
+  if (value.length != 14) return value;
+  final year = value.substring(0, 4);
+  final month = value.substring(4, 6);
+  final day = value.substring(6, 8);
+  final hour = value.substring(8, 10);
+  final minute = value.substring(10, 12);
+  final second = value.substring(12, 14);
+  return '$day/$month/$year $hour:$minute:$second';
+}
+
 String gatewayFromJson(Object? value) =>
     value is String && value.isNotEmpty ? value : kDefaultGateway;
 

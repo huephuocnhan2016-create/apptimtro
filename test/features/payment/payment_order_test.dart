@@ -125,4 +125,9 @@ void main() {
       'MOMO',
     );
   });
+
+  test('đổi ngày giờ cổng thanh toán yyyyMMddHHmmss sang dd/MM/yyyy', () {
+    expect(formatGatewayPayDate('20261109153045'), '09/11/2026 15:30:45');
+    expect(formatGatewayPayDate('khác dạng'), 'khác dạng');
+  });
 }
