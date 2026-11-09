@@ -30,4 +30,23 @@ export const environmentSchema = Joi.object({
   VNPAY_SECURE_SECRET: Joi.string().allow('').optional(),
   VNPAY_HASH_ALGORITHM: Joi.string().valid('SHA512', 'SHA256').default('SHA512'),
   VNPAY_QUERY_IP_ADDR: Joi.string().ip().default('127.0.0.1'),
+  MOMO_PARTNER_CODE: Joi.string().allow('').optional(),
+  MOMO_ACCESS_KEY: Joi.string().allow('').optional(),
+  MOMO_SECRET_KEY: Joi.string().allow('').optional(),
+  MOMO_ENDPOINT: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .allow('')
+    .optional(),
+  MOMO_RETURN_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .allow('')
+    .optional(),
+  MOMO_IPN_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .allow('')
+    .optional(),
+  MOMO_REQUEST_TYPE: Joi.string()
+    .valid('payWithApp', 'payWithQrCode', 'payWithATM', 'pay')
+    .allow('')
+    .default('payWithApp'),
 });

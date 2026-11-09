@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
 import '../../rooms/domain/room.dart';
+import '../domain/momo_result_codes.dart';
 import '../domain/payment_order.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -29,6 +31,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     with WidgetsBindingObserver {
   static const _background = Color(0xFFF2F5FB);
   static const _brand = Color(0xFF1A5CFF);
+  static const _momoBrand = Color(0xFFD1001B);
   static const _ink = Color(0xFF0F172A);
   static const _muted = Color(0xFF64748B);
   static const _success = Color(0xFF16A34A);
@@ -38,10 +41,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   PaymentResult? _result;
   Timer? _timer;
   String? _error;
-  bool _loading = true;
+  bool _loading = false;
   bool _checkingStatus = false;
   bool _launching = false;
   bool _cancelling = false;
+
+  /// The portal the student picked. Only used to open an order; once there is
+  /// one, the server's own gateway column is what the screen shows.
+  String _gateway = kDefaultGateway;
+
+  /// The demo's debug switch: what the app asked the portal to do and what it
+  /// answered. Only collected in debug builds, and never a secret or a token.
+  final List<String> _debugLog = [];
+
+  void _log(String line) {
+    if (!kDebugMode || !mounted) return;
+    setState(() {
+      _debugLog.insert(0, line);
+      if (_debugLog.length > 6) _debugLog.removeLast();
+    });
+  }
 
   @override
   void initState() {
@@ -49,10 +68,24 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     WidgetsBinding.instance.addObserver(this);
     if (widget.txnRef != null) {
       _readExistingOrder();
-    } else {
-      _createOrder();
     }
   }
+
+  bool get _isMomo => _activeGateway == 'MOMO';
+
+  String get _activeGateway =>
+      _result?.gateway ?? _order?.gateway ?? _gateway;
+
+  /// Upper-case, as the portals write their own names on the checkout page.
+  String get _portalLabel => _isMomo ? 'MOMO' : 'VNPAY';
+
+  /// Brand-cased, for the choices the student reads.
+  String get _portalName => _portalDisplayName(_activeGateway);
+
+  static String _portalDisplayName(String gateway) =>
+      gateway == 'MOMO' ? 'MoMo' : 'VNPay';
+
+  Color get _portalBrand => _isMomo ? _momoBrand : _brand;
 
   @override
   void dispose() {
@@ -79,12 +112,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     try {
       final order = await ref
           .read(paymentApiProvider)
-          .createOrder(widget.room!.id);
+          .createOrder(widget.room!.id, gateway: _gateway);
       if (!mounted) return;
       setState(() {
         _order = order;
         _loading = false;
       });
+      _log(
+        '${order.gateway}: ${order.amount.toInt()} VND, '
+        '${order.deeplink != null ? 'có deep link ví' : 'chỉ link web'}',
+      );
       if (order.status == 'PENDING') _startPolling();
     } catch (error) {
       if (!mounted) return;
@@ -93,6 +130,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         _error = 'Không tạo được yêu cầu đặt cọc: ${apiErrorMessage(error)}';
       });
     }
+  }
+
+  // Switching portals means dropping the checkout that was never paid for, so
+  // the student is not left holding an order under the old gateway.
+  void _chooseAnotherGateway() {
+    _timer?.cancel();
+    setState(() {
+      _order = null;
+      _result = null;
+      _error = null;
+      _loading = false;
+    });
   }
 
   String? get _activeTxnRef => _order?.txnRef ?? widget.txnRef;
@@ -134,22 +183,39 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     final order = _order;
     if (order == null || _launching) return;
     setState(() => _launching = true);
-    var opened = true;
+    // The demo opens MoMo inside the wallet app and only falls back to the web
+    // page, because no test device is guaranteed to have MoMo installed.
+    final links = <(String, String)>[
+      if (_isMomo && order.deeplink != null) (
+        'app $_portalName',
+        order.deeplink!,
+      ),
+      ('trang web', order.payUrl),
+    ];
+    var opened = false;
+    for (final link in links) {
+      opened = await _launch(link.$2);
+      _log('Mở ${link.$1}: ${opened ? 'thành công' : 'không được'}');
+      if (opened) break;
+    }
+    if (!mounted) return;
+    setState(() {
+      _launching = false;
+      if (!opened) _error = 'Không mở được cổng thanh toán $_portalName.';
+    });
+  }
+
+  Future<bool> _launch(String url) async {
     try {
-      opened = await launchUrl(
-        Uri.parse(order.payUrl),
+      return await launchUrl(
+        Uri.parse(url),
         // A Chrome custom tab refuses intent:// links to another package, so
         // the portal's "Về ứng dụng" button only lands in a real browser tab.
         mode: LaunchMode.externalApplication,
       );
     } catch (_) {
-      opened = false;
+      return false;
     }
-    if (!mounted) return;
-    setState(() {
-      _launching = false;
-      if (!opened) _error = 'Không mở được cổng thanh toán VNPAY.';
-    });
   }
 
   Future<void> _checkStatus() async {
@@ -164,6 +230,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         _result = result;
         _error = null;
       });
+      _log(
+        '${result.status}: ${result.responseCode == null ? 'chưa có mã' : 'mã ${result.responseCode}'}'
+        ' — ${result.message}',
+      );
       if (result.isSettled) _timer?.cancel();
     } catch (error) {
       if (!mounted) return;
@@ -244,12 +314,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                     child: Center(child: CircularProgressIndicator()),
                   )
                 else if (_order == null && widget.txnRef == null)
-                  _errorCard()
+                  _error != null ? _errorCard() : _gatewayPicker()
                 else ...[
                   if (_order != null) _infoCard(_order!) else _referenceCard(),
                   const SizedBox(height: 16),
                   if (_order != null && (_result == null || !_result!.isSettled))
-                    _payButton(),
+                    ...[_payButton(), _gatewaySwitch()],
                   if (_canCancel) ...[
                     const SizedBox(height: 12),
                     _cancelButton(),
@@ -269,6 +339,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                   if (_result == null || !_result!.isSettled) ...[
                     const SizedBox(height: 16),
                     _pendingNote(),
+                  ],
+                  if (_debugLog.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _debugCard(),
                   ],
                 ],
                 const SizedBox(height: 20),
@@ -297,22 +371,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           },
           icon: const Icon(Icons.chevron_left, color: _ink),
         ),
-        const _BrandMark(),
+        _BrandMark(
+          label: _isMomo ? 'M' : 'VN',
+          brand: _portalBrand,
+        ),
         const SizedBox(width: 10),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'VNPAY',
-                style: TextStyle(
+                _portalLabel,
+                style: const TextStyle(
                   color: _ink,
                   fontWeight: FontWeight.w800,
                   fontSize: 17,
                   height: 1.1,
                 ),
               ),
-              Text(
+              const Text(
                 'THANH TOÁN AN TOÀN',
                 style: TextStyle(
                   color: _muted,
@@ -337,17 +414,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   bool get _isSandbox {
     final order = _order;
     if (order == null) return false;
-    return order.payUrl.contains('sandbox') || order.payUrl.contains('/dev/');
+    // Both the shared dev checkout page and MoMo's test host stand in for a
+    // portal that no real money moves through.
+    return order.payUrl.contains('sandbox') ||
+        order.payUrl.contains('/dev/') ||
+        order.payUrl.contains('test-payment.momo.vn');
   }
 
   Widget _heroCard() => Container(
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(18),
-      gradient: const LinearGradient(
+      gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFF1A5CFF), Color(0xFF0B3FBF)],
+        colors: _isMomo
+            ? const [Color(0xFFD1001B), Color(0xFF9E0014)]
+            : const [Color(0xFF1A5CFF), Color(0xFF0B3FBF)],
       ),
     ),
     child: Column(
@@ -369,9 +452,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Giao dịch của bạn được bảo vệ bởi VNPAY.',
-          style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
+        Text(
+          'Giao dịch của bạn được bảo vệ bởi $_portalName.',
+          style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -398,7 +481,69 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           Text(_error!, style: const TextStyle(color: _failure, fontSize: 13)),
         const SizedBox(height: 14),
         FilledButton(onPressed: _createOrder, child: const Text('Thử lại')),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _chooseAnotherGateway,
+          child: const Text('Chọn cổng khác'),
+        ),
       ],
+    ),
+  );
+
+  Widget _gatewayPicker() => _Card(
+    title: 'Chọn cổng thanh toán',
+    subtitle: 'App tạo yêu cầu sau khi bạn chọn, chưa trừ tiền ở bước này',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _GatewayOption(
+          value: 'VNPAY',
+          selected: _gateway == 'VNPAY',
+          brand: _brand,
+          mark: 'VN',
+          name: 'VNPay',
+          detail: 'Chuyển khoản ngân hàng, ví VNPay, thẻ nội địa',
+          onSelect: (value) => setState(() => _gateway = value),
+        ),
+        const SizedBox(height: 10),
+        _GatewayOption(
+          value: 'MOMO',
+          selected: _gateway == 'MOMO',
+          brand: _momoBrand,
+          mark: 'M',
+          name: 'MoMo',
+          detail: 'Ví MoMo, QR MoMo, thẻ quốc tế',
+          onSelect: (value) => setState(() => _gateway = value),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _createOrder,
+          style: FilledButton.styleFrom(
+            backgroundColor: _portalBrand,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          icon: const Icon(Icons.arrow_forward),
+          label: Text('Thanh toán qua $_portalName'),
+        ),
+      ],
+    ),
+  );
+
+  Widget _gatewaySwitch() => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: TextButton.icon(
+      onPressed: _chooseAnotherGateway,
+      style: TextButton.styleFrom(
+        foregroundColor: _muted,
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
+      icon: const Icon(Icons.swap_horiz, size: 18),
+      label: const Text('Đổi cổng thanh toán'),
     ),
   );
 
@@ -425,18 +570,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           ),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Phương thức thanh toán',
                       style: TextStyle(color: _muted, fontSize: 12),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Cổng thanh toán VNPAY',
-                      style: TextStyle(
+                      'Cổng thanh toán $_portalName',
+                      style: const TextStyle(
                         color: _ink,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -445,16 +590,109 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
                   ],
                 ),
               ),
-              const Icon(Icons.check_circle, color: _brand, size: 22),
+              Icon(Icons.check_circle, color: _portalBrand, size: 22),
             ],
           ),
         ),
         const SizedBox(height: 12),
+        if (_isMomo && order.qrCodeUrl != null) ...[
+          _qrPanel(order.qrCodeUrl!),
+          const SizedBox(height: 12),
+        ],
+        if (_isMomo)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _showResultCodes,
+              style: TextButton.styleFrom(
+                foregroundColor: _momoBrand,
+                padding: EdgeInsets.zero,
+              ),
+              icon: const Icon(Icons.help_outline, size: 18),
+              label: const Text('Xem mã kết quả MoMo'),
+            ),
+          ),
         Text(
           'Phòng: ${widget.room!.title}',
           style: const TextStyle(color: _muted, fontSize: 12),
         ),
       ],
+    ),
+  );
+
+  // MoMo paints the QR itself, so the app only shows the picture it links to.
+  Widget _qrPanel(String qrCodeUrl) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      children: [
+        Image.network(
+          qrCodeUrl,
+          height: 160,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.qr_code_2,
+            size: 96,
+            color: _muted,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Quét mã bằng ứng dụng MoMo để thanh toán',
+          style: TextStyle(color: _muted, fontSize: 12),
+        ),
+      ],
+    ),
+  );
+
+  void _showResultCodes() => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        children: [
+          const Text(
+            'Mã kết quả MoMo',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _ink),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'MoMo trả về mã này trong thông báo kết quả.',
+            style: TextStyle(color: _muted, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          for (final entry in kMomoResultCodes.entries)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 52,
+                    child: Text(
+                      entry.key,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: _momoBrand,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      entry.value,
+                      style: const TextStyle(fontSize: 13, color: _ink),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     ),
   );
 
@@ -481,7 +719,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   Widget _payButton() => FilledButton.icon(
     onPressed: _launching ? null : _openPortal,
     style: FilledButton.styleFrom(
-      backgroundColor: _brand,
+      backgroundColor: _portalBrand,
       foregroundColor: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 16),
       textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
@@ -547,18 +785,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               fontWeight: FontWeight.w700,
             ),
           ),
-          if (result.responseCode != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            children: [
+              _Pill(
+                label: _stateLabel(result),
+                background: _stateBackground(result),
+                foreground: color,
+              ),
+              if (result.responseCode != null)
                 _Pill(
                   label: 'Mã ${result.responseCode}',
                   background: const Color(0xFFF1F5F9),
                   foreground: _ink,
                 ),
-              ],
-            ),
-          ],
+            ],
+          ),
           const SizedBox(height: 14),
           _DetailRow(
             label: 'Số tiền',
@@ -569,7 +812,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           _DetailRow(label: 'Ngân hàng', value: result.bankName),
           if (result.transactionNo != null)
             _DetailRow(
-              label: 'Mã giao dịch VNPAY',
+              label: 'Mã giao dịch ${_portalDisplayName(result.gateway)}',
               value: result.transactionNo!,
             ),
           if (result.payDate != null)
@@ -614,12 +857,48 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       const SizedBox(width: 8),
       Expanded(
         child: Text(
-          'Ứng dụng không chứa Hash Secret. Đường dẫn thanh toán được máy chủ '
-          'ký HMAC-SHA512 và trả về cho app.',
+          'Ứng dụng không chứa khóa bí mật. Đường dẫn thanh toán được máy chủ '
+          'ký HMAC-${_isMomo ? 'SHA256' : 'SHA512'} và trả về cho app.',
           style: const TextStyle(color: _muted, fontSize: 11, height: 1.4),
         ),
       ),
     ],
+  );
+
+  // The three states the demo promises the student: paid, refused, and still
+  // waiting on the portal. Only the first one may read as a booked room.
+  static String _stateLabel(PaymentResult result) {
+    if (!result.isSettled) return 'Đang xử lý';
+    return result.status == 'PAID' ? 'Thành công' : 'Thất bại';
+  }
+
+  static Color _stateBackground(PaymentResult result) {
+    if (!result.isSettled) return const Color(0xFFF1F5F9);
+    return result.status == 'PAID'
+        ? const Color(0xFFECFDF5)
+        : const Color(0xFFFEE2E2);
+  }
+
+  Widget _debugCard() => _Card(
+    title: 'Nhật ký cổng thanh toán',
+    subtitle: 'Bản debug: yêu cầu và trả lời của cổng',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final line in _debugLog)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Text(
+              line,
+              style: const TextStyle(
+                color: _muted,
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+      ],
+    ),
   );
 
   String _formatPayDate(String value) {
@@ -635,7 +914,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 }
 
 class _BrandMark extends StatelessWidget {
-  const _BrandMark();
+  const _BrandMark({required this.label, required this.brand});
+
+  /// The portal's own short mark, as the header shows it.
+  final String label;
+  final Color brand;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -643,15 +926,92 @@ class _BrandMark extends StatelessWidget {
     height: 38,
     alignment: Alignment.center,
     decoration: BoxDecoration(
-      color: const Color(0xFF1A5CFF),
+      color: brand,
       borderRadius: BorderRadius.circular(10),
     ),
-    child: const Text(
-      'VN',
-      style: TextStyle(
+    child: Text(
+      label,
+      style: const TextStyle(
         color: Colors.white,
         fontWeight: FontWeight.w800,
         fontSize: 14,
+      ),
+    ),
+  );
+}
+
+/// One row of the portal chooser. The app makes no gateway decision of its own:
+/// picking a row only says which portal the order should be opened through.
+class _GatewayOption extends StatelessWidget {
+  const _GatewayOption({
+    required this.value,
+    required this.selected,
+    required this.brand,
+    required this.mark,
+    required this.name,
+    required this.detail,
+    required this.onSelect,
+  });
+
+  final String value;
+  final bool selected;
+  final Color brand;
+  final String mark;
+  final String name;
+  final String detail;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: () => onSelect(value),
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFFEFF4FF) : Colors.white,
+        border: Border.all(
+          color: selected ? brand : const Color(0xFFE2E8F0),
+          width: selected ? 1.5 : 1,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            selected
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
+            color: selected ? brand : const Color(0xFF94A3B8),
+            size: 22,
+          ),
+          const SizedBox(width: 12),
+          _BrandMark(label: mark, brand: brand),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     ),
   );

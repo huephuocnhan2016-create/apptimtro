@@ -17,8 +17,10 @@ class _FakePaymentApi implements PaymentApi {
   Object? cancelFailure;
 
   @override
-  Future<PaymentOrder> createOrder(String roomId) async =>
-      throw UnimplementedError();
+  Future<PaymentOrder> createOrder(
+    String roomId, {
+    String gateway = kDefaultGateway,
+  }) async => throw UnimplementedError();
 
   @override
   Future<PaymentResult> status(String txnRef) async =>

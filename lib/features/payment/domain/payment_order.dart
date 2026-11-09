@@ -1,3 +1,8 @@
+/// Which checkout portal an order was opened through. The backend stores the
+/// same strings in its PaymentGateway enum and answers every payment route with
+/// them, so the app never has to guess a portal from a URL.
+const String kDefaultGateway = 'VNPAY';
+
 class PaymentOrder {
   const PaymentOrder({
     required this.txnRef,
@@ -5,6 +10,9 @@ class PaymentOrder {
     required this.amount,
     required this.status,
     required this.orderInfo,
+    this.gateway = kDefaultGateway,
+    this.deeplink,
+    this.qrCodeUrl,
   });
 
   final String txnRef;
@@ -12,6 +20,12 @@ class PaymentOrder {
   final num amount;
   final String status;
   final String orderInfo;
+  final String gateway;
+
+  /// MoMo answers with a wallet deep link and a QR image next to the web page;
+  /// portals that only have a web checkout leave both null.
+  final String? deeplink;
+  final String? qrCodeUrl;
 
   factory PaymentOrder.fromJson(Map<String, dynamic> json) {
     final txnRef = json['txnRef'];
@@ -32,9 +46,18 @@ class PaymentOrder {
       amount: amount,
       status: status,
       orderInfo: orderInfo,
+      gateway: gatewayFromJson(json['gateway']),
+      deeplink: optionalLink(json['deeplink']),
+      qrCodeUrl: optionalLink(json['qrCodeUrl']),
     );
   }
 }
+
+String? optionalLink(Object? value) =>
+    value is String && value.isNotEmpty ? value : null;
+
+String gatewayFromJson(Object? value) =>
+    value is String && value.isNotEmpty ? value : kDefaultGateway;
 
 class PaymentResult {
   const PaymentResult({
@@ -46,12 +69,14 @@ class PaymentResult {
     required this.responseCode,
     required this.payDate,
     required this.message,
+    this.gateway = kDefaultGateway,
   });
 
   final String status;
   final String txnRef;
   final num amount;
   final String bankName;
+  final String gateway;
   final String? transactionNo;
   final String? responseCode;
   final String? payDate;
@@ -77,6 +102,7 @@ class PaymentResult {
       txnRef: txnRef,
       amount: amount,
       bankName: bankName,
+      gateway: gatewayFromJson(json['gateway']),
       transactionNo: json['transactionNo'] as String?,
       responseCode: json['responseCode'] as String?,
       payDate: json['payDate'] as String?,
@@ -89,6 +115,7 @@ class PaymentResult {
     txnRef: txnRef,
     amount: amount,
     bankName: bankName,
+    gateway: gateway,
     transactionNo: transactionNo,
     responseCode: responseCode,
     payDate: payDate,
