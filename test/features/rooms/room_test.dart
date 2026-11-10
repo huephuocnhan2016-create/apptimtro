@@ -36,6 +36,44 @@ void main() {
     expect(room.landlordPhone, '0900000000');
   });
 
+  test('reads the rating block and defaults it when absent', () {
+    final reviewed = Room.fromJson({
+      'id': 'room-1',
+      'title': 'Phòng đã có người đánh giá',
+      'address': 'Quận 1',
+      'price': 4500000,
+      'area': 22.5,
+      'totalRooms': 4,
+      'availableRooms': 2,
+      'electricityPrice': 3000,
+      'waterPrice': 12000,
+      'internetPrice': 100000,
+      'deposit': 4500000,
+      'rating': {'average': 4.5, 'count': 2},
+      'canReview': true,
+    });
+    final fresh = Room.fromJson({
+      'id': 'room-2',
+      'title': 'Phòng chưa có đánh giá',
+      'address': 'Quận 1',
+      'price': 4500000,
+      'area': 22.5,
+      'totalRooms': 4,
+      'availableRooms': 2,
+      'electricityPrice': 3000,
+      'waterPrice': 12000,
+      'internetPrice': 100000,
+      'deposit': 4500000,
+    });
+
+    expect(reviewed.ratingAverage, 4.5);
+    expect(reviewed.ratingCount, 2);
+    expect(reviewed.canReview, isTrue);
+    expect(fresh.ratingAverage, isNull);
+    expect(fresh.ratingCount, 0);
+    expect(fresh.canReview, isFalse);
+  });
+
   test('parses address-only rooms without coordinates', () {
     final room = Room.fromJson({
       'id': 'room-without-location',

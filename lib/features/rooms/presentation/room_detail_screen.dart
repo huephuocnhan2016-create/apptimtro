@@ -13,6 +13,7 @@ import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../domain/room.dart';
+import '../domain/room_review.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
   const RoomDetailScreen({required this.roomId, super.key});
@@ -25,6 +26,7 @@ class RoomDetailScreen extends ConsumerStatefulWidget {
 
 class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   late Future<Room> _room;
+  late Future<List<RoomReview>> _reviews;
   bool _favorite = false;
 
   @override
@@ -33,11 +35,15 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     _room = _load();
   }
 
-  Future<Room> _load() =>
-      ref.read(roomRepositoryProvider).get(widget.roomId).then((room) {
-        if (mounted) _favorite = room.isFavorite;
-        return room;
-      });
+  Future<Room> _load() {
+    // Đọc lại cùng lúc: gửi đánh giá xong thì điểm trung bình và danh sách
+    // phải đổi ngay, nếu không người dùng tưởng lần gửi trước đã mất.
+    _reviews = ref.read(roomRepositoryProvider).reviews(widget.roomId);
+    return ref.read(roomRepositoryProvider).get(widget.roomId).then((room) {
+      if (mounted) _favorite = room.isFavorite;
+      return room;
+    });
+  }
 
   void _reload() {
     if (mounted) {
@@ -68,6 +74,34 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
           SnackBar(
             content: Text(
               'Không thể cập nhật yêu thích: ${apiErrorMessage(error)}',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Chỉ sinh viên đã cọc mới có nút này; server vẫn kiểm tra lại lần nữa
+  /// nên một phiên bản app cũ cũng không gửi được đánh giá trái điều kiện.
+  Future<void> _writeReview(Room room) async {
+    final draft = await showDialog<_ReviewDraft>(
+      context: context,
+      builder: (context) => const _ReviewDialog(),
+    );
+    if (draft == null || !mounted) return;
+    try {
+      await ref.read(roomRepositoryProvider).submitReview(
+        room.id,
+        rating: draft.rating,
+        comment: draft.comment,
+      );
+      _reload();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Không gửi được đánh giá: ${apiErrorMessage(error)}',
             ),
           ),
         );
@@ -215,6 +249,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             room.description.isEmpty ? 'Chưa có mô tả.' : room.description,
           ),
         ),
+        _reviewsSection(context, room),
         SectionCard(
           title: 'Vị trí',
           child: room.latitude != null && room.longitude != null
@@ -285,6 +320,91 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  Widget _reviewsSection(BuildContext context, Room room) {
+    final theme = Theme.of(context);
+    return SectionCard(
+      title: 'Đánh giá',
+      subtitle: room.ratingCount == 0
+          ? 'Chưa có đánh giá'
+          : '${formatNumber(room.ratingAverage!)} / 5 · ${room.ratingCount} lượt',
+      trailing: room.canReview
+          ? FilledButton.tonalIcon(
+              onPressed: () => _writeReview(room),
+              icon: const Icon(Icons.rate_review_outlined),
+              label: const Text('Đánh giá'),
+            )
+          : null,
+      child: FutureBuilder<List<RoomReview>>(
+        future: _reviews,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Text(
+              'Không tải được đánh giá: ${apiErrorMessage(snapshot.error!)}',
+            );
+          }
+          if (!snapshot.hasData) {
+            return const LinearProgressIndicator(minHeight: 2);
+          }
+          final reviews = snapshot.data!;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (reviews.isEmpty)
+                Text(
+                  room.canReview
+                      ? 'Chưa có đánh giá nào — bạn là người đầu tiên ở đây.'
+                      : 'Chưa có đánh giá nào.',
+                )
+              else
+                for (final review in reviews) _reviewRow(context, review),
+              if (!room.canReview)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Chỉ sinh viên đã đặt cọc phòng này mới bình luận và đánh giá được.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _reviewRow(BuildContext context, RoomReview review) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(review.author, style: theme.textTheme.titleSmall),
+              ),
+              Text(
+                formatDateVn(review.createdAt),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          _Stars(value: review.rating.toDouble()),
+          if (review.comment != null && review.comment!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(review.comment!),
+          ],
+        ],
+      ),
+    );
+  }
+
   /// Thanh hành động cố định dưới đáy — vị trí chuẩn của nút chính trong app
   /// Android khi nội dung dài và phải cuộn.
   Widget _actionBar(BuildContext context, Room room) {
@@ -331,4 +451,106 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
       ),
     );
   }
+}
+
+/// Hàng sao đọc được từ điểm trung bình: 4,5 làm tròn nửa ngôi giữa.
+class _Stars extends StatelessWidget {
+  const _Stars({required this.value});
+
+  final double? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final score = value ?? 0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var star = 1; star <= 5; star++)
+          Icon(
+            score >= star
+                ? Icons.star
+                : score >= star - 0.5
+                ? Icons.star_half
+                : Icons.star_border,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+      ],
+    );
+  }
+}
+
+class _ReviewDraft {
+  const _ReviewDraft(this.rating, this.comment);
+
+  final int rating;
+  final String? comment;
+}
+
+class _ReviewDialog extends StatefulWidget {
+  const _ReviewDialog();
+
+  @override
+  State<_ReviewDialog> createState() => _ReviewDialogState();
+}
+
+class _ReviewDialogState extends State<_ReviewDialog> {
+  final _comment = TextEditingController();
+  int _rating = 0;
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Đánh giá phòng'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var star = 1; star <= 5; star++)
+              IconButton(
+                onPressed: () => setState(() => _rating = star),
+                tooltip: '$star sao',
+                icon: Icon(
+                  _rating >= star ? Icons.star : Icons.star_border,
+                  size: 32,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+          ],
+        ),
+        TextField(
+          controller: _comment,
+          maxLines: 4,
+          maxLength: 500,
+          decoration: const InputDecoration(
+            labelText: 'Bình luận của bạn',
+            hintText: 'Ví dụ: phòng sạch, chủ trọ trả lời nhanh',
+          ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Hủy'),
+      ),
+      FilledButton(
+        onPressed: _rating == 0
+            ? null
+            : () => Navigator.pop(
+                context,
+                _ReviewDraft(_rating, _comment.text.trim()),
+              ),
+        child: const Text('Gửi đánh giá'),
+      ),
+    ],
+  );
 }

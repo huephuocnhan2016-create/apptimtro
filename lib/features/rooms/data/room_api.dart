@@ -43,6 +43,18 @@ class RoomApi {
   Future<void> unfavorite(String id) =>
       _client.dio.delete<void>('/rooms/$id/favorite');
 
+  Future<List<Map<String, dynamic>>> reviews(String id) async =>
+      _list(await _client.dio.get<dynamic>('/rooms/$id/reviews'));
+
+  Future<void> submitReview(
+    String id, {
+    required int rating,
+    String? comment,
+  }) => _client.dio.post<void>(
+    '/rooms/$id/reviews',
+    data: {'rating': rating, 'comment': ?comment},
+  );
+
   Future<Map<String, dynamic>> create(Map<String, Object?> data) async =>
       (await _client.dio.post<Map<String, dynamic>>(
         '/rooms',

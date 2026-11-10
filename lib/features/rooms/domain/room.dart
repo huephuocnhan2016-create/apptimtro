@@ -25,6 +25,9 @@ class Room {
     this.landlordPhone,
     this.isFavorite = false,
     this.hasDeposit = false,
+    this.ratingAverage,
+    this.ratingCount = 0,
+    this.canReview = false,
   });
 
   final String id;
@@ -52,6 +55,9 @@ class Room {
   final String? landlordPhone;
   final bool isFavorite;
   final bool hasDeposit;
+  final double? ratingAverage;
+  final int ratingCount;
+  final bool canReview;
 
   factory Room.fromJson(Map<String, dynamic> json) {
     final landlord = json['landlord'];
@@ -100,6 +106,14 @@ class Room {
           : null,
       isFavorite: json['isFavorite'] as bool? ?? false,
       hasDeposit: json['hasDeposit'] as bool? ?? false,
+      ratingAverage: _nullableDouble(
+        (json['rating'] as Map<String, dynamic>?)?['average'],
+      ),
+      ratingCount:
+          ((json['rating'] as Map<String, dynamic>?)?['count'] as num?)
+              ?.toInt() ??
+          0,
+      canReview: json['canReview'] as bool? ?? false,
     );
   }
 

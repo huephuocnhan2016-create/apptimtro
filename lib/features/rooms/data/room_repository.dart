@@ -1,4 +1,5 @@
 import '../domain/room.dart';
+import '../domain/room_review.dart';
 import 'room_api.dart';
 
 class RoomRepository {
@@ -29,6 +30,10 @@ class RoomRepository {
 
   Future<void> favorite(String id) => api.favorite(id);
   Future<void> unfavorite(String id) => api.unfavorite(id);
+  Future<List<RoomReview>> reviews(String id) async =>
+      (await api.reviews(id)).map(RoomReview.fromJson).toList();
+  Future<void> submitReview(String id, {required int rating, String? comment}) =>
+      api.submitReview(id, rating: rating, comment: comment);
   Future<Room> create(Map<String, Object?> data) async =>
       Room.fromJson(await api.create(data));
   Future<Room> update(String id, Map<String, Object?> data) async =>

@@ -46,6 +46,7 @@ describe('RoomsService', () => {
     },
     roomImage: { create: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
     payment: { findFirst: jest.fn() },
+    roomReview: { aggregate: jest.fn() },
     favorite: {
       upsert: jest.fn(),
       deleteMany: jest.fn(),
@@ -65,6 +66,10 @@ describe('RoomsService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     geocoding.geocode.mockResolvedValue(null);
+    prisma.roomReview.aggregate.mockResolvedValue({
+      _avg: { rating: null },
+      _count: 0,
+    });
   });
 
   it('creates a room owned by the authenticated landlord', async () => {
@@ -298,6 +303,10 @@ describe('RoomsService', () => {
   it('tells a student which room they already hold a deposit on', async () => {
     prisma.room.findUnique.mockResolvedValue(room);
     prisma.payment.findFirst.mockResolvedValue({ id: 'paid-order' });
+    prisma.roomReview.aggregate.mockResolvedValue({
+      _avg: { rating: 4.5 },
+      _count: 2,
+    });
     const student = { ...landlord, role: UserRole.STUDENT } as User;
 
     const result = await service.getOne(room.id, student);
@@ -308,5 +317,17 @@ describe('RoomsService', () => {
     });
     expect(result.hasDeposit).toBe(true);
     expect(result.isFavorite).toBe(false);
+    expect(result.rating).toEqual({ average: 4.5, count: 2 });
+    expect(result.canReview).toBe(true);
+  });
+
+  it('opens the review button only for students who paid a deposit', async () => {
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.findFirst.mockResolvedValue(null);
+
+    const student = { ...landlord, role: UserRole.STUDENT } as User;
+    expect((await service.getOne(room.id, student)).canReview).toBe(false);
+    expect((await service.getOne(room.id, landlord)).canReview).toBe(false);
+    expect((await service.getOne(room.id)).canReview).toBe(false);
   });
 });

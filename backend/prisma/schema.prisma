@@ -29,6 +29,7 @@ model User {
   conversationsAsStudent  Conversation[] @relation("studentChats")
   conversationsAsLandlord Conversation[] @relation("landlordChats")
   payments     Payment[]
+  roomReviews  RoomReview[]
 
   @@map("users")
 }
@@ -66,6 +67,7 @@ model Room {
   favorites       Favorite[]
   conversations   Conversation[]
   payments        Payment[]
+  reviews         RoomReview[]
 
   @@index([landlordId, createdAt])
   @@index([status, price])
@@ -113,6 +115,25 @@ model Conversation {
   @@index([studentId, createdAt])
   @@index([landlordId, createdAt])
   @@map("conversations")
+}
+
+// One review per student per room: a second POST edits that row instead of
+// appending another voice for the same stay.
+model RoomReview {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  room    Room @relation(fields: [roomId],    references: [id], onDelete: Cascade)
+
+  @@unique([studentId, roomId])
+  @@index([roomId, createdAt])
+  @@map("room_reviews")
 }
 
 enum PaymentStatus {

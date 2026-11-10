@@ -85,7 +85,19 @@ export class RoomsService {
           select: { id: true },
         }))
       : false;
-    return { ...this.serialize(room), isFavorite, hasDeposit };
+    const rating = await this.prisma.roomReview.aggregate({
+      where: { roomId: id },
+      _avg: { rating: true },
+      _count: true,
+    });
+    return {
+      ...this.serialize(room),
+      isFavorite,
+      hasDeposit,
+      rating: { average: rating._avg.rating ?? null, count: rating._count },
+      // The write endpoint repeats this check; the flag only hides the button.
+      canReview: user?.role === UserRole.STUDENT && hasDeposit,
+    };
   }
 
   async update(user: User, id: string, dto: UpdateRoomDto) {
