@@ -62,7 +62,7 @@ export class PaymentService {
     payment: {
       txnRef: string;
       createdAt: Date;
-      gatewayRequestId: string | null;
+      gatewayRequestId?: string | null;
     },
     gateway: PaymentGateway,
     amount: number,
@@ -108,50 +108,50 @@ export class PaymentService {
         'This room is no longer open for a deposit.',
       );
     }
-    const alreadyHeld = await this.holdsDeposit({
-      client: this.prisma,
-      studentId: user.id,
-      roomId: room.id,
-    });
-    if (alreadyHeld) {
-      throw new ConflictException('Bạn đã đặt cọc phòng này rồi.');
-    }
-
     const amount = Math.round(Number(room.deposit));
     if (!Number.isSafeInteger(amount) || amount <= 0) {
       throw new BadGatewayException('Room has an invalid payment amount.');
     }
-    const payment = await this.prisma.payment.create({
-      data: {
-        studentId: user.id,
-        roomId: room.id,
-        txnRef: randomUUID().replace(/-/g, ''),
-        amount,
-        gateway,
-        // MoMo echoes this back on query, and reusing it keeps a retry of the
-        // same order from looking like a new one to their side.
-        gatewayRequestId: randomUUID().replace(/-/g, ''),
-      },
-    });
-    const orderInfo = this.orderInfoFor(payment.txnRef);
+
+    // A student keeps at most one live order per room. Re-opening the portal
+    // they already used resumes that checkout with its own txnRef, switching
+    // portal retires it first, and a paid deposit is closed. Without this the
+    // app could press "Đặt cọc" as many times as it liked and leave several
+    // unpaid checkouts on the same room.
+    const live = await this.liveDeposit(user.id, room.id);
+    if (live?.status === PaymentStatus.PAID) {
+      throw new ConflictException('Bạn đã đặt cọc phòng này rồi.');
+    }
+    if (live && this.gatewayOf(live) === gateway) {
+      return this.checkoutFor(live, gateway, ip);
+    }
+    if (live) {
+      await this.markCancelled(live, PaymentStatus.PENDING);
+    }
+
+    // Two requests can pass the read above at the same time; the partial
+    // unique index picks the winner and the loser reports the same answer.
+    const payment = await this.prisma.payment
+      .create({
+        data: {
+          studentId: user.id,
+          roomId: room.id,
+          txnRef: randomUUID().replace(/-/g, ''),
+          amount,
+          gateway,
+          // MoMo echoes this back on query, and reusing it keeps a retry of the
+          // same order from looking like a new one to their side.
+          gatewayRequestId: randomUUID().replace(/-/g, ''),
+        },
+      })
+      .catch((error) => {
+        if (this.isUniqueViolation(error)) {
+          throw new ConflictException('Bạn đã đặt cọc phòng này rồi.');
+        }
+        throw error;
+      });
     try {
-      const checkout = await this.checkoutUrl(
-        payment,
-        gateway,
-        amount,
-        orderInfo,
-        ip,
-      );
-      return new PaymentOrderEntity(
-        payment.txnRef,
-        checkout.payUrl,
-        amount,
-        payment.status,
-        orderInfo,
-        gateway,
-        checkout.deeplink,
-        checkout.qrCodeUrl,
-      );
+      return await this.checkoutFor(payment, gateway, ip);
     } catch (error) {
       // Keeps failed orders out of the PENDING pool the status poller scans.
       await this.prisma.payment
@@ -162,6 +162,47 @@ export class PaymentService {
         .catch(() => undefined);
       throw error;
     }
+  }
+
+  // Builds the portal link for an order. The txnRef and gateway request id
+  // come from the row, so a resumed checkout stays one attempt on the portal
+  // side instead of looking like a new transaction.
+  private async checkoutFor(
+    payment: {
+      txnRef: string;
+      createdAt: Date;
+      amount: unknown;
+      gatewayRequestId?: string | null;
+    },
+    gateway: PaymentGateway,
+    ip: string,
+  ) {
+    const amount = Math.round(Number(payment.amount));
+    const orderInfo = this.orderInfoFor(payment.txnRef);
+    const checkout = await this.checkoutUrl(
+      payment,
+      gateway,
+      amount,
+      orderInfo,
+      ip,
+    );
+    return new PaymentOrderEntity(
+      payment.txnRef,
+      checkout.payUrl,
+      amount,
+      PaymentStatus.PENDING,
+      orderInfo,
+      gateway,
+      checkout.deeplink,
+      checkout.qrCodeUrl,
+    );
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    );
   }
 
   // A student pulling out of a deposit. Money already handed to a portal can
@@ -317,6 +358,19 @@ export class PaymentService {
       transactionNo: this.devTransactionNo(payment.txnRef),
       responseCode,
       payDate: new Date(),
+    });
+  }
+
+  // The order that currently ties a student to a room: an unpaid checkout or
+  // a paid deposit. Cancelled and failed orders are history and free the key.
+  private async liveDeposit(studentId: string, roomId: string) {
+    return this.prisma.payment.findFirst({
+      where: {
+        studentId,
+        roomId,
+        status: { in: [PaymentStatus.PENDING, PaymentStatus.PAID] },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

@@ -145,7 +145,8 @@ class PaymentController extends Notifier<PaymentState> {
     }
   }
 
-  /// Đổi cổng = bỏ đơn chưa thanh toán, để người dùng không bị giữ đơn ở cổng cũ.
+  /// Đổi cổng chỉ xóa đơn cục bộ: máy chủ tự hủy đơn PENDING của cổng cũ khi
+  /// tạo đơn mới, nên mỗi phòng luôn chỉ còn một yêu cầu cọc đang hiệu lực.
   void chooseAnotherGateway() {
     _timer?.cancel();
     state = state.copyWith(

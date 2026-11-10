@@ -96,10 +96,7 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
                           child: Icon(Icons.apartment_outlined),
                         ),
                       ),
-                title: Text(
-                  deposit.roomTitle,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
+                title: Text(deposit.roomTitle),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -108,25 +105,19 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
                     Text(
                       'Cọc ${formatVnd(deposit.amount)}'
                       '${deposit.payDate == null ? '' : ' · ${formatDateVn(deposit.payDate!)}'}',
-                      style: const TextStyle(fontSize: 12),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton(
-                      onPressed: _cancellingTxnRef == deposit.txnRef
-                          ? null
-                          : () => _cancel(deposit),
-                      child: Text(
-                        _cancellingTxnRef == deposit.txnRef
-                            ? 'Đang hủy…'
-                            : 'Hủy cọc',
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right),
-                  ],
+                trailing: TextButton(
+                  onPressed: _cancellingTxnRef == deposit.txnRef
+                      ? null
+                      : () => _cancel(deposit),
+                  child: Text(
+                    _cancellingTxnRef == deposit.txnRef
+                        ? 'Đang hủy…'
+                        : 'Hủy cọc',
+                  ),
                 ),
                 onTap: () => context.push('/rooms/${deposit.roomId}'),
               ),

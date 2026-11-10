@@ -77,8 +77,8 @@ class _StudentRegisterScreenState extends ConsumerState<StudentRegisterScreen> {
   Widget build(BuildContext context) => AuthScaffold(
     title: 'Tạo hồ sơ sinh viên',
     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 20),
         TextField(
           controller: _name,
           textCapitalization: TextCapitalization.words,
@@ -144,15 +144,15 @@ class _LandlordRegisterScreenState
   Widget build(BuildContext context) => AuthScaffold(
     title: 'Tạo tài khoản chủ trọ',
     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 20),
         TextField(
           controller: _name,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.next,
           decoration: const InputDecoration(labelText: 'Họ và tên'),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         TextField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,

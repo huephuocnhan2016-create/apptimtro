@@ -55,10 +55,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               key: ValueKey(room.id),
               direction: DismissDirection.endToStart,
               background: Container(
-                color: Colors.red,
+                color: Theme.of(context).colorScheme.errorContainer,
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 24),
-                child: const Icon(Icons.favorite_border, color: Colors.white),
+                child: Icon(
+                  Icons.favorite_border,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
               ),
               confirmDismiss: (_) async {
                 try {

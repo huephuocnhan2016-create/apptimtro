@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Ảnh mạng có sẵn: nền chờ khi đang tải, khung báo lỗi khi tải hỏng, và
@@ -30,7 +31,7 @@ class AppNetworkImage extends StatelessWidget {
     final w = width;
     final cacheWidth = w != null && w.isFinite ? (w * dpr).round() : null;
     Widget image = Image.network(
-      url,
+      AppConstants.resolveAssetUrl(url),
       width: width,
       height: height,
       fit: fit,

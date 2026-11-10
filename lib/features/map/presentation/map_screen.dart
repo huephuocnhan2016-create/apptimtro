@@ -91,6 +91,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final markers = _rooms
         .where((room) => room.latitude != null && room.longitude != null)
         .map(
@@ -105,11 +106,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 _showRoom(room);
               },
               icon: Icon(
-                Icons.location_on,
+                room.id == _selectedRoomId ? Icons.push_pin : Icons.location_on,
                 size: 42,
                 color: room.id == _selectedRoomId
-                    ? Colors.deepOrange
-                    : Colors.green.shade700,
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.error,
               ),
             ),
           ),
@@ -286,11 +287,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Bán kính ${selected.toStringAsFixed(0)} km'),
+                Text(
+                  'Bán kính ${selected.toStringAsFixed(0)} km',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 Slider(
                   value: selected,
                   min: 1,
@@ -355,26 +360,49 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       isScrollControlled: true,
       builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (room.image != null)
-                AppNetworkImage(
-                  room.image!,
-                  height: 150,
-                  width: double.infinity,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AppNetworkImage(
+                    room.image!,
+                    height: 150,
+                    width: double.infinity,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
                 ),
-              const SizedBox(height: 12),
               Text(room.title, style: Theme.of(context).textTheme.titleLarge),
-              Text(room.address),
+              Text(
+                room.address,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('${formatVnd(room.price)}/tháng'),
-              Text('Còn ${room.availableRooms} phòng'),
+              Row(
+                children: [
+                  Text(
+                    '${formatVnd(room.price)}/tháng',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Còn ${room.availableRooms} phòng',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
               if (room.distance != null)
-                Text('Cách bạn ${room.distance!.toStringAsFixed(1)} km'),
+                Text(
+                  'Cách bạn ${room.distance!.toStringAsFixed(1)} km',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () {
@@ -436,10 +464,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 point: selected,
                 width: 48,
                 height: 48,
-                child: const Icon(
+                child: Icon(
                   Icons.location_on,
                   size: 42,
-                  color: Colors.green,
+                  color: Theme.of(context).colorScheme.error,
                 ),
               ),
             ],

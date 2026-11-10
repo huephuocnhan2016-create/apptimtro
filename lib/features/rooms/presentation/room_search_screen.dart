@@ -54,9 +54,25 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
       ..._filters,
     });
 
+  int get _filterCount =>
+      _filters.keys.where((key) => key != 'sort').length;
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Tìm phòng trọ')),
+    appBar: AppBar(
+      title: const Text('Tìm phòng trọ'),
+      actions: [
+        IconButton(
+          tooltip: 'Lọc phòng',
+          onPressed: _filtersDialog,
+          icon: Badge(
+            isLabelVisible: _filterCount > 0,
+            label: Text('$_filterCount'),
+            child: const Icon(Icons.tune),
+          ),
+        ),
+      ],
+    ),
     body: Column(
       children: [
         Padding(
@@ -75,14 +91,8 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
                   ),
                 ),
               ),
-              IconButton(
-                onPressed: _filtersDialog,
-                icon: const Icon(Icons.tune),
-              ),
-              IconButton(
-                onPressed: _search,
-                icon: const Icon(Icons.arrow_forward),
-              ),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: _search, child: const Text('Tìm')),
             ],
           ),
         ),
@@ -103,6 +113,7 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
                 },
                 child: ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 16),
                   itemCount: rooms.length,
                   itemBuilder: (context, index) =>
                       RoomCard(room: rooms[index]),
@@ -235,4 +246,3 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
         ),
       );
 }
-

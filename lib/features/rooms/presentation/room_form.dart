@@ -12,6 +12,8 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
 import '../../map/presentation/open_street_map_layers.dart';
+import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../domain/room.dart';
 
 class RoomForm extends ConsumerStatefulWidget {
@@ -84,65 +86,92 @@ class _RoomFormState extends ConsumerState<RoomForm> {
   Widget build(BuildContext context) => Form(
     key: _formKey,
     child: ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       children: [
-        _text('title', 'Tên phòng', required: true),
-        _text(
-          'address',
-          'Địa chỉ',
-          required: true,
-          helperText: 'Nhập địa chỉ; nếu thiết bị không tìm được tọa độ, máy chủ sẽ thử tìm khi lưu.',
-        ),
-        _locationPreview(),
-        OutlinedButton.icon(
-          onPressed: _gettingCurrentLocation ? null : _useCurrentLocation,
-          icon: const Icon(Icons.my_location),
-          label: Text(
-            _gettingCurrentLocation
-                ? 'Đang lấy vị trí...'
-                : 'Dùng vị trí GPS hiện tại',
+        SectionCard(
+          title: 'Thông tin phòng',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _text('title', 'Tên phòng', required: true),
+              _text('description', 'Mô tả', maxLines: 4),
+              _text('amenities', 'Tiện ích (phân cách bằng dấu phẩy)'),
+            ],
           ),
         ),
-        _text('description', 'Mô tả', maxLines: 4),
-        _number('price', 'Giá thuê (đ/tháng)', required: true),
-        _number('area', 'Diện tích (m²)', required: true),
-        _number('totalRooms', 'Tổng số phòng', required: true, integer: true),
-        _number(
-          'availableRooms',
-          'Số phòng còn',
-          required: true,
-          integer: true,
-        ),
-        _number('electricityPrice', 'Tiền điện (đ/kWh)'),
-        _number('waterPrice', 'Tiền nước (đ/tháng)'),
-        _number('internetPrice', 'Internet (đ/tháng)'),
-        _number('deposit', 'Tiền cọc (đ)'),
-        OutlinedButton.icon(
-          onPressed: _pickLocation,
-          icon: const Icon(Icons.map_outlined),
-          label: const Text('Chỉnh vị trí trên bản đồ'),
-        ),
-        _text('amenities', 'Tiện ích (phân cách bằng dấu phẩy)'),
-        OutlinedButton.icon(
-          onPressed: _pickImages,
-          icon: const Icon(Icons.add_photo_alternate_outlined),
-          label: Text(
-            _images.isEmpty
-                ? 'Chọn ảnh phòng'
-                : 'Đã chọn ${_images.length} ảnh',
+        SectionCard(
+          title: 'Chi phí',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _number('price', 'Giá thuê (đ/tháng)', required: true),
+              _number('area', 'Diện tích (m²)', required: true),
+              _number('totalRooms', 'Tổng số phòng', required: true, integer: true),
+              _number('availableRooms', 'Số phòng còn', required: true, integer: true),
+              _number('electricityPrice', 'Tiền điện (đ/kWh)'),
+              _number('waterPrice', 'Tiền nước (đ/tháng)'),
+              _number('internetPrice', 'Internet (đ/tháng)'),
+              _number('deposit', 'Tiền cọc (đ)'),
+            ],
           ),
         ),
-        if (widget.room?.images.isNotEmpty ?? false)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text('Ảnh hiện tại: ${widget.room!.images.length}'),
+        SectionCard(
+          title: 'Vị trí',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _text(
+                'address',
+                'Địa chỉ',
+                required: true,
+                helperText:
+                    'Nhập địa chỉ; nếu thiết bị không tìm được tọa độ, máy chủ sẽ thử tìm khi lưu.',
+              ),
+              _locationPreview(),
+              OutlinedButton.icon(
+                onPressed: _gettingCurrentLocation ? null : _useCurrentLocation,
+                icon: const Icon(Icons.my_location),
+                label: Text(
+                  _gettingCurrentLocation
+                      ? 'Đang lấy vị trí...'
+                      : 'Dùng vị trí GPS hiện tại',
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _pickLocation,
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Chỉnh vị trí trên bản đồ'),
+              ),
+            ],
           ),
+        ),
+        SectionCard(
+          title: 'Hình ảnh',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _pickImages,
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: Text(
+                  _images.isEmpty
+                      ? 'Chọn ảnh phòng'
+                      : 'Đã chọn ${_images.length} ảnh',
+                ),
+              ),
+              if (widget.room?.images.isNotEmpty ?? false)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text('Ảnh hiện tại: ${widget.room!.images.length}'),
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: _saving
-              ? const CircularProgressIndicator()
-              : Text(widget.room == null ? 'Tạo phòng' : 'Lưu thay đổi'),
+        AppButton(
+          label: widget.room == null ? 'Tạo phòng' : 'Lưu thay đổi',
+          busy: _saving,
+          onPressed: _save,
         ),
       ],
     ),
@@ -195,9 +224,9 @@ class _RoomFormState extends ConsumerState<RoomForm> {
                           point: selected,
                           width: 44,
                           height: 44,
-                          child: const Icon(
+                          child: Icon(
                             Icons.location_on,
-                            color: Colors.green,
+                            color: Theme.of(context).colorScheme.error,
                             size: 40,
                           ),
                         ),

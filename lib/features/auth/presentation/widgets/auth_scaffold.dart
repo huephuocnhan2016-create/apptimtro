@@ -4,8 +4,9 @@ import '../../../../core/theme/app_theme.dart';
 
 /// Khung chung của các màn đăng nhập/đăng ký.
 ///
-/// Có [title] → nội dung cuộn được, nên bật bàn phím ở form đăng ký không còn
-/// bị sọc vàng "RenderFlex overflowed"; ô đang nhập tự cuộn lên trên bàn phím.
+/// Có [title] → tiêu đề nằm trên `AppBar` (chuẩn Android, không lặp lại trong
+/// thân màn hình) và nội dung cuộn được, nên bật bàn phím ở form đăng ký không
+/// còn bị sọc vàng "RenderFlex overflowed".
 /// Không có [title] (màn chào mừng) → giữ bố cục cố định để dùng được `Spacer`.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({required this.child, this.title, super.key});
@@ -34,15 +35,8 @@ class AuthScaffold extends StatelessWidget {
                   AppSpace.xxl,
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    child,
-                  ],
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [child],
                 ),
               ),
       ),
@@ -50,7 +44,7 @@ class AuthScaffold extends StatelessWidget {
   }
 }
 
-/// Thẻ chọn vai trò (sinh viên / chủ trọ).
+/// Thẻ chọn vai trò (sinh viên / chủ trọ) — `ListTile` trong `Card`.
 class RoleCard extends StatelessWidget {
   const RoleCard({
     required this.icon,
@@ -66,17 +60,20 @@ class RoleCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.all(AppSpace.lg),
-      leading: CircleAvatar(
-        backgroundColor: AppColors.brandSoft,
-        child: Icon(icon, color: AppColors.brand),
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        onTap: onTap,
+        leading: CircleAvatar(
+          backgroundColor: scheme.primaryContainer,
+          child: Icon(icon, color: scheme.onPrimaryContainer),
+        ),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-    ),
-  );
+    );
+  }
 }

@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../domain/user.dart';
 import 'auth_controller.dart';
@@ -59,11 +58,10 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
   Widget build(BuildContext context) => AuthScaffold(
     title: 'Số điện thoại của bạn',
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 12),
         const Text('Mã xác thực sẽ được gửi đến số điện thoại này.'),
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         TextField(
           controller: _phone,
           keyboardType: TextInputType.phone,
@@ -74,7 +72,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
             prefixText: '+84  ',
           ),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         AppButton(
           label: 'Gửi mã xác thực',
           busy: ref.watch(authControllerProvider).isLoading,
@@ -201,11 +199,11 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     return AuthScaffold(
       title: 'Nhập mã xác thực',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 10),
           Text('Mã OTP gồm 6 chữ số đã gửi đến ${widget.phone}'),
           if (devOtp != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             SelectableText(
               'Mã OTP phát triển: $devOtp',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -214,27 +212,30 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 26),
+          const SizedBox(height: 24),
           Pinput(
             length: 6,
             controller: _pin,
             keyboardType: TextInputType.number,
             onCompleted: (_) => _verify(),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           AppButton(label: 'Xác nhận', busy: busy, onPressed: _verify),
-          const SizedBox(height: AppSpace.md),
-          TextButton(
-            onPressed: busy || _secondsLeft > 0 ? null : _resend,
-            child: Text(
-              _secondsLeft > 0
-                  ? 'Gửi lại mã sau ${_secondsLeft}s'
-                  : 'Gửi lại mã',
-            ),
-          ),
-          TextButton(
-            onPressed: busy ? null : _changePhone,
-            child: const Text('Đổi số điện thoại'),
+          Row(
+            children: [
+              TextButton(
+                onPressed: busy || _secondsLeft > 0 ? null : _resend,
+                child: Text(
+                  _secondsLeft > 0
+                      ? 'Gửi lại mã sau ${_secondsLeft}s'
+                      : 'Gửi lại mã',
+                ),
+              ),
+              TextButton(
+                onPressed: busy ? null : _changePhone,
+                child: const Text('Đổi số điện thoại'),
+              ),
+            ],
           ),
         ],
       ),

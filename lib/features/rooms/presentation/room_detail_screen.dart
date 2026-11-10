@@ -11,6 +11,7 @@ import '../../../shared/widgets/async_state_view.dart';
 import '../../map/presentation/open_street_map_layers.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../domain/room.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
@@ -49,6 +50,36 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     _reload();
   }
 
+  Future<void> _toggleFavorite(Room room) async {
+    try {
+      if (_favorite) {
+        await ref.read(roomRepositoryProvider).unfavorite(room.id);
+      } else {
+        await ref.read(roomRepositoryProvider).favorite(room.id);
+      }
+      if (mounted) setState(() => _favorite = !_favorite);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Không thể cập nhật yêu thích: ${apiErrorMessage(error)}',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _copyPhone(Room room) async {
+    await Clipboard.setData(ClipboardData(text: room.landlordPhone!));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã sao chép số điện thoại')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -72,82 +103,112 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     ),
   );
 
-  Widget _details(BuildContext context, Room room) {
+  Widget _details(BuildContext context, Room room) => Column(
+    children: [
+      Expanded(child: _content(context, room)),
+      _actionBar(context, room),
+    ],
+  );
+
+  Widget _content(BuildContext context, Room room) {
+    final theme = Theme.of(context);
     final pictures = room.images.isNotEmpty
         ? room.images
         : room.image == null
         ? <String>[]
         : [room.image!];
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.only(bottom: 16),
       children: [
         if (pictures.isNotEmpty)
           SizedBox(
-            height: 250,
+            height: 230,
             child: PageView(
               children: pictures
-                  .map(
-                    (url) => AppNetworkImage(url, height: 250),
-                  )
+                  .map((url) => AppNetworkImage(url, height: 230))
                   .toList(),
             ),
           )
         else
           const SizedBox(
-            height: 180,
+            height: 160,
             child: Icon(Icons.home_work_outlined, size: 72),
           ),
         Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(room.title, style: theme.textTheme.titleLarge),
+              const SizedBox(height: 4),
               Text(
-                room.title,
-                style: Theme.of(context).textTheme.headlineSmall,
+                room.address,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(room.address),
               if (room.status == 'DEPOSITED') ...[
                 const SizedBox(height: 8),
                 Chip(
                   label: const Text('Đang cọc'),
-                  backgroundColor:
-                      Theme.of(context).colorScheme.secondaryContainer,
+                  backgroundColor: theme.colorScheme.secondaryContainer,
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
                 '${formatVnd(room.price)}/tháng',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
               ),
-              const SizedBox(height: 16),
-              _InfoLine('Diện tích', '${room.area} m²'),
-              _InfoLine(
-                'Phòng còn trống',
-                '${room.availableRooms}/${room.totalRooms}',
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SectionCard(
+          title: 'Thông tin phòng',
+          child: Column(
+            children: [
+              DetailRow(label: 'Diện tích', value: '${formatNumber(room.area)} m²'),
+              DetailRow(
+                label: 'Phòng còn trống',
+                value: '${room.availableRooms}/${room.totalRooms}',
               ),
-              _InfoLine('Tiền điện', '${room.electricityPrice} đ/kWh'),
-              _InfoLine('Tiền nước', '${room.waterPrice} đ/tháng'),
-              _InfoLine('Internet', '${room.internetPrice} đ/tháng'),
-              _InfoLine('Tiền cọc', '${room.deposit} đ'),
-              const SizedBox(height: 16),
-              Text('Tiện ích', style: Theme.of(context).textTheme.titleMedium),
-              Text(
-                room.amenities.isEmpty
-                    ? 'Chưa cập nhật'
-                    : room.amenities.join(' · '),
+            ],
+          ),
+        ),
+        SectionCard(
+          title: 'Chi phí',
+          child: Column(
+            children: [
+              DetailRow(
+                label: 'Tiền điện',
+                value: '${formatVnd(room.electricityPrice)}/kWh',
               ),
-              const SizedBox(height: 16),
-              Text('Mô tả', style: Theme.of(context).textTheme.titleMedium),
-              Text(
-                room.description.isEmpty ? 'Chưa có mô tả.' : room.description,
-              ),
-              const SizedBox(height: 16),
-              Text('Vị trí', style: Theme.of(context).textTheme.titleMedium),
-              if (room.latitude != null && room.longitude != null)
-                SizedBox(
+              DetailRow(label: 'Tiền nước', value: formatVnd(room.waterPrice)),
+              DetailRow(label: 'Internet', value: formatVnd(room.internetPrice)),
+              DetailRow(label: 'Tiền cọc', value: formatVnd(room.deposit)),
+            ],
+          ),
+        ),
+        SectionCard(
+          title: 'Tiện ích',
+          child: Text(
+            room.amenities.isEmpty
+                ? 'Chưa cập nhật'
+                : room.amenities.join(' · '),
+          ),
+        ),
+        SectionCard(
+          title: 'Mô tả',
+          child: Text(
+            room.description.isEmpty ? 'Chưa có mô tả.' : room.description,
+          ),
+        ),
+        SectionCard(
+          title: 'Vị trí',
+          child: room.latitude != null && room.longitude != null
+              ? SizedBox(
                   height: 180,
                   child: FlutterMap(
                     options: MapOptions(
@@ -162,9 +223,9 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                             point: LatLng(room.latitude!, room.longitude!),
                             width: 44,
                             height: 44,
-                            child: const Icon(
+                            child: Icon(
                               Icons.location_on,
-                              color: Colors.green,
+                              color: theme.colorScheme.error,
                               size: 40,
                             ),
                           ),
@@ -174,126 +235,90 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     ],
                   ),
                 )
-              else
-                Text(room.address),
-              const SizedBox(height: 12),
-              Text(
-                'Chủ trọ: ${room.landlordName ?? 'Chưa cập nhật'}',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              if (room.landlordAvatar != null)
-                CircleAvatar(
-                  child: ClipOval(
-                    child: AppNetworkImage(
-                      room.landlordAvatar!,
-                      width: 40,
-                      height: 40,
-                      errorWidget: const Icon(Icons.person_outline),
-                    ),
-                  ),
-                ),
-              if (room.landlordPhone != null)
-                Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText(
-                        'SĐT: ${room.landlordPhone}',
-                        style: Theme.of(context).textTheme.titleMedium,
+              : Text(room.address),
+        ),
+        SectionCard(
+          title: 'Chủ trọ',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: room.landlordAvatar == null
+                    ? const CircleAvatar(child: Icon(Icons.person_outline))
+                    : CircleAvatar(
+                        foregroundImage: NetworkImage(room.landlordAvatar!),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Sao chép số điện thoại',
-                      icon: const Icon(Icons.copy),
-                      onPressed: () async {
-                        await Clipboard.setData(
-                          ClipboardData(text: room.landlordPhone!),
-                        );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Đã sao chép số điện thoại'),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ],
+                title: Text(
+                  'Chủ trọ: ${room.landlordName ?? 'Chưa cập nhật'}',
+                ),
+              ),
+              if (room.landlordPhone != null)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.phone_outlined),
+                  title: SelectableText('SĐT: ${room.landlordPhone}'),
+                  trailing: IconButton(
+                    tooltip: 'Sao chép số điện thoại',
+                    icon: const Icon(Icons.copy),
+                    onPressed: () => _copyPhone(room),
+                  ),
                 )
               else
-                Text(
-                  'SĐT chủ trọ: Chưa cập nhật',
-                  style: Theme.of(context).textTheme.titleMedium,
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.phone_outlined),
+                  title: const Text('SĐT chủ trọ: Chưa cập nhật'),
                 ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      try {
-                        if (_favorite) {
-                          await ref
-                              .read(roomRepositoryProvider)
-                              .unfavorite(room.id);
-                        } else {
-                          await ref
-                              .read(roomRepositoryProvider)
-                              .favorite(room.id);
-                        }
-                        if (mounted) setState(() => _favorite = !_favorite);
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Không thể cập nhật yêu thích: ${apiErrorMessage(error)}',
-                              ),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: Icon(
-                      _favorite ? Icons.favorite : Icons.favorite_border,
-                    ),
-                    label: Text(_favorite ? 'Đã yêu thích' : 'Yêu thích'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: room.hasDeposit || room.status == 'DEPOSITED'
-                        ? null
-                        : () => _openPayment(room),
-                    icon: const Icon(Icons.account_balance_wallet_outlined),
-                    label: Text(
-                      room.hasDeposit
-                          ? 'Bạn đã cọc'
-                          : room.status == 'DEPOSITED'
-                          ? 'Hết chỗ cọc'
-                          : 'Đặt cọc',
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ],
     );
   }
-}
 
-class _InfoLine extends StatelessWidget {
-  const _InfoLine(this.label, this.value);
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [Text(label), Text(value)],
-    ),
-  );
+  /// Thanh hành động cố định dưới đáy — vị trí chuẩn của nút chính trong app
+  /// Android khi nội dung dài và phải cuộn.
+  Widget _actionBar(BuildContext context, Room room) {
+    final theme = Theme.of(context);
+    final canDeposit = !room.hasDeposit && room.status != 'DEPOSITED';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _toggleFavorite(room),
+                icon: Icon(
+                  _favorite ? Icons.favorite : Icons.favorite_border,
+                  color: _favorite ? theme.colorScheme.error : null,
+                ),
+                label: Text(_favorite ? 'Đã yêu thích' : 'Yêu thích'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: canDeposit ? () => _openPayment(room) : null,
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  label: Text(
+                    room.hasDeposit
+                        ? 'Bạn đã cọc'
+                        : room.status == 'DEPOSITED'
+                        ? 'Hết chỗ cọc'
+                        : 'Đặt cọc',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

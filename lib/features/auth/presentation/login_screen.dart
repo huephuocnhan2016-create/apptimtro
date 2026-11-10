@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_button.dart';
 import 'widgets/auth_scaffold.dart';
 
@@ -13,7 +12,11 @@ class WelcomeScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Spacer(),
-        const Icon(Icons.apartment_rounded, size: 74, color: AppColors.brand),
+        Icon(
+          Icons.apartment_rounded,
+          size: 74,
+          color: Theme.of(context).colorScheme.primary,
+        ),
         const SizedBox(height: 28),
         Text(
           'Tìm trọ dễ dàng,\nan tâm bắt đầu',
@@ -28,7 +31,7 @@ class WelcomeScreen extends StatelessWidget {
         OutlinedButton(
           onPressed: () => context.go('/register-role'),
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(54),
+            minimumSize: const Size.fromHeight(48),
           ),
           child: const Text('Tạo tài khoản'),
         ),
@@ -45,10 +48,10 @@ class AuthFlowExpiredScreen extends StatelessWidget {
   Widget build(BuildContext context) => AuthScaffold(
     title: 'Phiên xác thực đã hết',
     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 12),
         const Text('Vui lòng bắt đầu lại để xác thực số điện thoại.'),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         AppButton(label: 'Quay lại', onPressed: () => context.go('/welcome')),
       ],
     ),
@@ -61,13 +64,12 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) => AuthScaffold(
     title: 'Chào mừng trở lại',
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 12),
         const Text(
           'Đăng nhập bằng số điện thoại. Chúng tôi sẽ gửi mã xác thực OTP cho bạn.',
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
         AppButton(
           label: 'Tiếp tục với số điện thoại',
           onPressed: () => context.push('/phone?flow=login&role=STUDENT'),
@@ -87,17 +89,18 @@ class RegisterRoleScreen extends StatelessWidget {
   Widget build(BuildContext context) => AuthScaffold(
     title: 'Bạn tham gia với vai trò nào?',
     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
         RoleCard(
-          icon: Icons.school_rounded,
+          icon: Icons.school_outlined,
           title: 'Tôi là sinh viên',
           subtitle: 'Tìm kiếm phòng trọ phù hợp',
           onTap: () => context.push('/phone?role=STUDENT'),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
         RoleCard(
-          icon: Icons.key_rounded,
+          icon: Icons.key_outlined,
           title: 'Tôi là chủ trọ',
           subtitle: 'Tạo tài khoản chủ nhà',
           onTap: () => context.push('/phone?role=LANDLORD'),

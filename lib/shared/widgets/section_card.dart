@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_theme.dart';
-
-/// Khối nội dung nền trắng bo góc có tiêu đề (trước là `_Card` trong màn thanh toán).
+/// Một khối nội dung có tiêu đề — trong Android đây là `Card` chứa các dòng
+/// `TextView`/`ListView`, không tự vẽ bóng hay bo góc riêng.
 class SectionCard extends StatelessWidget {
   const SectionCard({
     required this.title,
@@ -18,51 +17,46 @@ class SectionCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.shadow,
-          blurRadius: 16,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: theme.textTheme.titleMedium),
+                      if (subtitle != null)
+                        Text(
+                          subtitle!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+                ?trailing,
+              ],
             ),
-            ?trailing,
+            const SizedBox(height: 12),
+            child,
           ],
         ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            subtitle!,
-            style: const TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-        ],
-        const SizedBox(height: 14),
-        child,
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
+/// Dòng "nhãn — giá trị": nhãn cột trái, giá trị cột phải, giống hàng
+/// `TextView` label/value trong Android.
 class LabeledField extends StatelessWidget {
   const LabeledField({
     required this.label,
@@ -76,33 +70,41 @@ class LabeledField extends StatelessWidget {
   final bool emphasize;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      border: Border.all(color: AppColors.border),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: emphasize ? 17 : 13,
-              fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: emphasize
+                  ? theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    )
+                  : theme.textTheme.bodyLarge,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
+/// Dòng chi tiết gọn trong thẻ trạng thái.
 class DetailRow extends StatelessWidget {
   const DetailRow({required this.label, required this.value, super.key});
 
@@ -110,36 +112,34 @@ class DetailRow extends StatelessWidget {
   final String value;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            style: const TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              color: AppColors.ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Text(value, textAlign: TextAlign.end),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
+/// Nhãn trạng thái dùng `Chip` của Material thay vì pill tự vẽ.
 class StatusPill extends StatelessWidget {
   const StatusPill({
     required this.label,
@@ -153,20 +153,19 @@ class StatusPill extends StatelessWidget {
   final Color foreground;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      color: background,
-      borderRadius: BorderRadius.circular(999),
+  Widget build(BuildContext context) => Chip(
+    label: Text(label),
+    labelStyle: TextStyle(
+      color: foreground,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
     ),
-    child: Text(
-      label,
-      style: TextStyle(
-        color: foreground,
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.4,
-      ),
+    backgroundColor: background,
+    side: BorderSide.none,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(8)),
     ),
+    visualDensity: VisualDensity.compact,
+    padding: EdgeInsets.zero,
   );
 }

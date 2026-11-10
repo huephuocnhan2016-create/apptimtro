@@ -8,6 +8,9 @@ final _time = DateFormat.Hm();
 String formatVnd(num amount, {String unit = 'đ'}) =>
     '${_vnd.format(amount)} $unit';
 
+/// 30 → "30", 30.5 → "30,5" — số đo không kèm đơn vị (diện tích).
+String formatNumber(num value) => _vnd.format(value);
+
 /// "dd/MM/yyyy HH:mm" theo giờ máy.
 String formatDateVn(DateTime value) => _dateTime.format(value.toLocal());
 

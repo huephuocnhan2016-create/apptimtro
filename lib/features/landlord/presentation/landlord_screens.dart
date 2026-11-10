@@ -68,11 +68,12 @@ class _MyRoomsScreenState extends ConsumerState<MyRoomsScreen> {
           onPressed: () => context.go('/home'),
           icon: const Icon(Icons.home_outlined),
         ),
-        IconButton(
-          onPressed: () => context.push('/landlord/rooms/add'),
-          icon: const Icon(Icons.add),
-        ),
       ],
+    ),
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: () => context.push('/landlord/rooms/add'),
+      icon: const Icon(Icons.add),
+      label: const Text('Đăng phòng'),
     ),
     body: FutureBuilder<List<Room>>(
       future: _rooms,
@@ -85,6 +86,7 @@ class _MyRoomsScreenState extends ConsumerState<MyRoomsScreen> {
         builder: (context, rooms) => RefreshIndicator(
           onRefresh: () async => _reload(),
           child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 88),
             itemCount: rooms.length,
             itemBuilder: (context, index) {
               final room = rooms[index];

@@ -8,6 +8,7 @@ import {
 import {
   PaymentGateway,
   PaymentStatus,
+  Prisma,
   User,
   UserRole,
 } from '@prisma/client';
@@ -133,7 +134,11 @@ describe('PaymentService', () => {
 
   it('refuses a second deposit on a room the student already holds', async () => {
     prisma.room.findUnique.mockResolvedValue(room);
-    prisma.payment.findFirst.mockResolvedValue({ id: 'already-paid' });
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'already-paid',
+      status: PaymentStatus.PAID,
+      gateway: PaymentGateway.VNPAY,
+    });
 
     await expect(
       service.create(student, { roomId: room.id }, '127.0.0.1'),
@@ -142,11 +147,91 @@ describe('PaymentService', () => {
       where: {
         studentId: student.id,
         roomId: room.id,
-        status: PaymentStatus.PAID,
+        status: { in: [PaymentStatus.PENDING, PaymentStatus.PAID] },
       },
-      select: { id: true },
+      orderBy: { createdAt: 'desc' },
     });
     expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('resumes the unpaid checkout instead of opening a second one', async () => {
+    const createdAt = new Date('2026-11-08T10:00:00.000Z');
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'pending-order',
+      txnRef: 'pending-ref',
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      gateway: PaymentGateway.VNPAY,
+      gatewayRequestId: 'pending-request',
+      createdAt,
+    });
+    vnpay.buildCheckoutUrl.mockReturnValue(
+      'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=pending-ref',
+    );
+
+    const result = await service.create(
+      student,
+      { roomId: room.id },
+      '127.0.0.1',
+    );
+
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+    expect(vnpay.buildCheckoutUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ txnRef: 'pending-ref', createdAt }),
+    );
+    expect(result.txnRef).toBe('pending-ref');
+  });
+
+  it('retires the unpaid checkout when the student switches portal', async () => {
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'pending-order',
+      txnRef: 'pending-ref',
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      gateway: PaymentGateway.VNPAY,
+      roomId: room.id,
+      createdAt: new Date('2026-11-08T10:00:00.000Z'),
+    });
+    prisma.payment.create.mockResolvedValue({
+      id: 'momo-order',
+      txnRef: 'momo-ref',
+      amount: 3000000,
+      status: PaymentStatus.PENDING,
+      gateway: PaymentGateway.MOMO,
+      createdAt: new Date('2026-11-08T10:05:00.000Z'),
+    });
+    momo.createOrder.mockResolvedValue({
+      payUrl: 'https://test-payment.momo.vn/v2/gateway/pay?orderId=momo-ref',
+      deeplink: null,
+    });
+
+    const result = await service.create(
+      student,
+      { roomId: room.id, gateway: PaymentGateway.MOMO },
+      '127.0.0.1',
+    );
+
+    expect(tx.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pending-order', status: PaymentStatus.PENDING },
+      data: { status: PaymentStatus.CANCELLED, responseCode: '24' },
+    });
+    expect(result.txnRef).toBe('momo-ref');
+  });
+
+  it('reports the same conflict when a parallel request wins the unique index', async () => {
+    prisma.room.findUnique.mockResolvedValue(room);
+    prisma.payment.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('duplicate key', {
+        code: 'P2002',
+        clientVersion: '6.19.3',
+      }),
+    );
+
+    await expect(
+      service.create(student, { roomId: room.id }, '127.0.0.1'),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('marks the order failed when no checkout URL can be built', async () => {

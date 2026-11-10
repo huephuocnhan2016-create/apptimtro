@@ -4,6 +4,7 @@
 // Chay:  npx prisma db seed
 import { readFileSync, existsSync } from 'node:fs';
 import { PrismaClient, RoomStatus, UserRole } from '@prisma/client';
+import { attachRoomImages } from './room_images.mjs';
 
 const SEED = 20261105;
 const SOURCE = new URL('./data/vn_communes_sample.json', import.meta.url);
@@ -116,6 +117,12 @@ async function main() {
 
   console.log(`Tao ${rooms.length} phong cho ${landlord.fullName} (${landlord.phone})...`);
   await prisma.room.createMany({ data: rooms });
+
+  const images = await attachRoomImages(prisma);
+  console.log(
+    `Gan anh mau: ${images.images} anh cho ${images.rooms} phong ` +
+    `(${images.assets} file trong uploads/)`,
+  );
 
   const summary = await prisma.$queryRaw`
     SELECT u."full_name" AS "chu tro",

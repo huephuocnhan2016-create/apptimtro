@@ -127,6 +127,9 @@ enum PaymentGateway {
   MOMO
 }
 
+// The "at most one PENDING/PAID order per student and room" rule is enforced
+// by the partial unique index payments_active_deposit_key, which only exists
+// in migration 20261110000000 (Prisma cannot declare partial indexes).
 model Payment {
   id               String         @id @default(uuid()) @db.Uuid
   studentId        String         @map("student_id") @db.Uuid
