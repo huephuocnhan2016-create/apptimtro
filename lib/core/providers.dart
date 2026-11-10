@@ -34,7 +34,9 @@ final authRepositoryProvider = Provider(
     ref.watch(tokenStorageProvider),
   ),
 );
-final currentUserProvider = NotifierProvider<UserNotifier, AppUser?>(UserNotifier.new);
+final currentUserProvider = NotifierProvider<UserNotifier, AppUser?>(
+  UserNotifier.new,
+);
 
 class UserNotifier extends Notifier<AppUser?> {
   @override
@@ -46,8 +48,9 @@ class UserNotifier extends Notifier<AppUser?> {
 
 /// `true` khi splash đã đọc xong phiên đăng nhập cũ. Router dựa vào cờ này để
 /// không đẩy nhầm người đã đăng nhập về login lúc app vừa mở.
-final sessionRestoredProvider =
-    NotifierProvider<SessionRestoredNotifier, bool>(SessionRestoredNotifier.new);
+final sessionRestoredProvider = NotifierProvider<SessionRestoredNotifier, bool>(
+  SessionRestoredNotifier.new,
+);
 
 class SessionRestoredNotifier extends Notifier<bool> {
   @override

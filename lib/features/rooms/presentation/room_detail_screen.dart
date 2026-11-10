@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/network/api_error_message.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/async_state_view.dart';
 import '../../map/presentation/open_street_map_layers.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
+import '../../../shared/widgets/rating_stars.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../domain/room.dart';
 import '../domain/room_review.dart';
@@ -90,19 +92,15 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
     if (draft == null || !mounted) return;
     try {
-      await ref.read(roomRepositoryProvider).submitReview(
-        room.id,
-        rating: draft.rating,
-        comment: draft.comment,
-      );
+      await ref
+          .read(roomRepositoryProvider)
+          .submitReview(room.id, rating: draft.rating, comment: draft.comment);
       _reload();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Không gửi được đánh giá: ${apiErrorMessage(error)}',
-            ),
+            content: Text('Không gửi được đánh giá: ${apiErrorMessage(error)}'),
           ),
         );
       }
@@ -156,72 +154,103 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         ? <String>[]
         : [room.image!];
     return ListView(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpace.lg),
       children: [
-        if (pictures.isNotEmpty)
-          SizedBox(
-            height: 230,
-            child: PageView(
-              children: pictures
-                  .map((url) => AppNetworkImage(url, height: 230))
-                  .toList(),
-            ),
-          )
-        else
-          const SizedBox(
-            height: 160,
-            child: Icon(Icons.home_work_outlined, size: 72),
-          ),
+        _Gallery(pictures: pictures),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.lg,
+            AppSpace.lg,
+            AppSpace.lg,
+            AppSpace.md,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(room.title, style: theme.textTheme.titleLarge),
-              const SizedBox(height: 4),
-              Text(
-                room.address,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              Text(room.title, style: theme.textTheme.headlineSmall),
+              const SizedBox(height: AppSpace.xs),
+              Row(
+                children: [
+                  Icon(
+                    Icons.place_outlined,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: AppSpace.xs),
+                  Expanded(
+                    child: Text(
+                      room.address,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              if (room.status == 'DEPOSITED') ...[
-                const SizedBox(height: 8),
-                Chip(
-                  label: const Text('Đang cọc'),
-                  backgroundColor: theme.colorScheme.secondaryContainer,
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                '${formatVnd(room.price)}/tháng',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
+              const SizedBox(height: AppSpace.sm),
+              Row(
+                children: [
+                  if (room.ratingCount > 0)
+                    RatingBadge(
+                      average: room.ratingAverage!,
+                      count: room.ratingCount,
+                    ),
+                  if (room.status == 'DEPOSITED') ...[
+                    if (room.ratingCount > 0)
+                      const SizedBox(width: AppSpace.sm),
+                    StatusPill(
+                      label: 'Đang cọc',
+                      background: theme.colorScheme.secondaryContainer,
+                      foreground: theme.colorScheme.onSecondaryContainer,
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        SectionCard(
-          title: 'Thông tin phòng',
-          child: Column(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          child: Row(
             children: [
-              DetailRow(
-                label: 'Diện tích',
-                value: '${formatNumber(room.area)} m²',
-              ),
-              DetailRow(
-                label: 'Phòng còn trống',
+              _Fact(value: '${formatNumber(room.area)} m²', label: 'Diện tích'),
+              _Fact(
                 value: '${room.availableRooms}/${room.totalRooms}',
+                label: 'Phòng trống',
+              ),
+              _Fact(
+                value: room.deposit > 0 ? formatVnd(room.deposit) : 'Không cọc',
+                label: 'Cọc',
               ),
             ],
           ),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        SectionCard(
+          title: 'Tiện ích',
+          child: room.amenities.isEmpty
+              ? Text('Chưa cập nhật')
+              : Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.sm,
+                  children: [
+                    for (final amenity in room.amenities)
+                      Chip(
+                        label: Text(amenity),
+                        backgroundColor: AppColors.brandSoft,
+                        side: BorderSide.none,
+                      ),
+                  ],
+                ),
         ),
         SectionCard(
           title: 'Chi phí',
           child: Column(
             children: [
+              DetailRow(
+                label: 'Giá thuê',
+                value: '${formatVnd(room.price)}/tháng',
+              ),
               DetailRow(
                 label: 'Tiền điện',
                 value: '${formatVnd(room.electricityPrice)}/kWh',
@@ -229,18 +258,12 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               DetailRow(label: 'Tiền nước', value: formatVnd(room.waterPrice)),
               DetailRow(
                 label: 'Internet',
-                value: formatVnd(room.internetPrice),
+                value: room.internetPrice > 0
+                    ? '${formatVnd(room.internetPrice)}/tháng'
+                    : 'Miễn phí',
               ),
               DetailRow(label: 'Tiền cọc', value: formatVnd(room.deposit)),
             ],
-          ),
-        ),
-        SectionCard(
-          title: 'Tiện ích',
-          child: Text(
-            room.amenities.isEmpty
-                ? 'Chưa cập nhật'
-                : room.amenities.join(' · '),
           ),
         ),
         SectionCard(
@@ -253,31 +276,34 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         SectionCard(
           title: 'Vị trí',
           child: room.latitude != null && room.longitude != null
-              ? SizedBox(
-                  height: 180,
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCenter: LatLng(room.latitude!, room.longitude!),
-                      initialZoom: 15,
-                    ),
-                    children: [
-                      openStreetMapTileLayer(),
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: LatLng(room.latitude!, room.longitude!),
-                            width: 44,
-                            height: 44,
-                            child: Icon(
-                              Icons.location_on,
-                              color: theme.colorScheme.error,
-                              size: 40,
-                            ),
-                          ),
-                        ],
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: SizedBox(
+                    height: 180,
+                    child: FlutterMap(
+                      options: MapOptions(
+                        initialCenter: LatLng(room.latitude!, room.longitude!),
+                        initialZoom: 15,
                       ),
-                      openStreetMapAttribution(),
-                    ],
+                      children: [
+                        openStreetMapTileLayer(),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: LatLng(room.latitude!, room.longitude!),
+                              width: 44,
+                              height: 44,
+                              child: const Icon(
+                                Icons.location_pin,
+                                color: AppColors.brand,
+                                size: 40,
+                              ),
+                            ),
+                          ],
+                        ),
+                        openStreetMapAttribution(),
+                      ],
+                    ),
                   ),
                 )
               : Text(room.address),
@@ -294,13 +320,17 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     : CircleAvatar(
                         foregroundImage: NetworkImage(room.landlordAvatar!),
                       ),
-                title: Text('Chủ trọ: ${room.landlordName ?? 'Chưa cập nhật'}'),
+                title: Text(
+                  room.landlordName ?? 'Chưa cập nhật',
+                  style: theme.textTheme.titleMedium,
+                ),
+                subtitle: const Text('Chủ trọ'),
               ),
               if (room.landlordPhone != null)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.phone_outlined),
-                  title: SelectableText('SĐT: ${room.landlordPhone}'),
+                  title: SelectableText(room.landlordPhone!),
                   trailing: IconButton(
                     tooltip: 'Sao chép số điện thoại',
                     icon: const Icon(Icons.copy),
@@ -376,13 +406,27 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
   Widget _reviewRow(BuildContext context, RoomReview review) {
     final theme = Theme.of(context);
+    final initial = review.author.trim().isEmpty
+        ? ''
+        : review.author.trim()[0].toUpperCase();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: AppColors.brandSoft,
+                child: Text(
+                  initial,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.brand,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Text(review.author, style: theme.textTheme.titleSmall),
               ),
@@ -394,10 +438,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          _Stars(value: review.rating.toDouble()),
+          const SizedBox(height: AppSpace.xs),
+          RatingStars(rating: review.rating.toDouble(), size: 16),
           if (review.comment != null && review.comment!.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpace.xs),
             Text(review.comment!),
           ],
         ],
@@ -406,7 +450,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   }
 
   /// Thanh hành động cố định dưới đáy — vị trí chuẩn của nút chính trong app
-  /// Android khi nội dung dài và phải cuộn.
+  /// Android khi nội dung dài và phải cuộn. Giá nằm cạnh nút vì quyết định
+  /// đặt cọc luôn gắn với giá, không phải đoán lại từ nội dung phía trên.
   Widget _actionBar(BuildContext context, Room room) {
     final theme = Theme.of(context);
     final canDeposit = !room.hasDeposit && room.status != 'DEPOSITED';
@@ -420,23 +465,46 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.lg,
+            AppSpace.sm,
+            AppSpace.lg,
+            AppSpace.sm,
+          ),
           child: Row(
             children: [
-              OutlinedButton.icon(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    formatVnd(room.price),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontFeatures: AppTypography.tabularFigures,
+                    ),
+                  ),
+                  Text(
+                    'mỗi tháng',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: _favorite ? 'Bỏ yêu thích' : 'Yêu thích',
                 onPressed: () => _toggleFavorite(room),
                 icon: Icon(
                   _favorite ? Icons.favorite : Icons.favorite_border,
                   color: _favorite ? theme.colorScheme.error : null,
                 ),
-                label: Text(_favorite ? 'Đã yêu thích' : 'Yêu thích'),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpace.md),
               Expanded(
-                child: FilledButton.icon(
+                flex: 2,
+                child: FilledButton(
                   onPressed: canDeposit ? () => _openPayment(room) : null,
-                  icon: const Icon(Icons.account_balance_wallet_outlined),
-                  label: Text(
+                  child: Text(
                     room.hasDeposit
                         ? 'Bạn đã cọc'
                         : room.status == 'DEPOSITED'
@@ -453,29 +521,144 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   }
 }
 
-/// Hàng sao đọc được từ điểm trung bình: 4,5 làm tròn nửa ngôi giữa.
-class _Stars extends StatelessWidget {
-  const _Stars({required this.value});
+/// Thư viện ảnh bìa: trượt ngang, số trang và chấm chỉ báo để người dùng biết
+/// còn những ảnh nào chưa xem.
+class _Gallery extends StatefulWidget {
+  const _Gallery({required this.pictures});
 
-  final double? value;
+  final List<String> pictures;
+
+  @override
+  State<_Gallery> createState() => _GalleryState();
+}
+
+class _GalleryState extends State<_Gallery> {
+  final _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final score = value ?? 0;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var star = 1; star <= 5; star++)
-          Icon(
-            score >= star
-                ? Icons.star
-                : score >= star - 0.5
-                ? Icons.star_half
-                : Icons.star_border,
-            size: 18,
-            color: Theme.of(context).colorScheme.primary,
+    if (widget.pictures.isEmpty) {
+      return const SizedBox(
+        height: 180,
+        child: ColoredBox(
+          color: AppColors.neutralSoft,
+          child: Center(
+            child: Icon(
+              Icons.home_work_outlined,
+              size: 64,
+              color: AppColors.subtle,
+            ),
           ),
-      ],
+        ),
+      );
+    }
+    final many = widget.pictures.length > 1;
+    return SizedBox(
+      height: 240,
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _controller,
+            itemCount: widget.pictures.length,
+            onPageChanged: (index) => setState(() => _page = index),
+            itemBuilder: (context, index) => AppNetworkImage(
+              widget.pictures[index],
+              width: double.infinity,
+              height: 240,
+            ),
+          ),
+          if (many)
+            Positioned(
+              right: AppSpace.md,
+              top: AppSpace.md,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.scrim,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpace.sm,
+                    vertical: AppSpace.xs,
+                  ),
+                  child: Text(
+                    '${_page + 1}/${widget.pictures.length}',
+                    style: const TextStyle(
+                      color: AppColors.onBrand,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (many)
+            Positioned(
+              bottom: AppSpace.md,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var index = 0; index < widget.pictures.length; index++)
+                    AnimatedContainer(
+                      duration: AppMotion.enter,
+                      curve: AppMotion.easeOut,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      height: 6,
+                      width: index == _page ? 18 : 6,
+                      decoration: BoxDecoration(
+                        color: index == _page
+                            ? AppColors.onBrand
+                            : AppColors.onBrandMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Một con số quét nhanh cạnh tiêu đề phòng: giá trị to, nhãn nhỏ.
+class _Fact extends StatelessWidget {
+  const _Fact({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontFeatures: AppTypography.tabularFigures,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -519,9 +702,11 @@ class _ReviewDialogState extends State<_ReviewDialog> {
                 onPressed: () => setState(() => _rating = star),
                 tooltip: '$star sao',
                 icon: Icon(
-                  _rating >= star ? Icons.star : Icons.star_border,
+                  _rating >= star
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
                   size: 32,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: AppColors.star,
                 ),
               ),
           ],

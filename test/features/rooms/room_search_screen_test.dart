@@ -93,14 +93,16 @@ void main() {
   const cheap = 'Phòng rẻ';
   const pricey = 'Phòng đắt';
 
-  testWidgets('bấm Tìm gửi từ khóa xuống repository', (tester) async {
+  testWidgets('nhấn Tìm trên bàn phím gửi từ khóa xuống repository', (
+    tester,
+  ) async {
     final repository = await _pump(tester, [
       _room(cheap, 1000000),
       _room(pricey, 5000000),
     ]);
 
     await tester.enterText(find.byType(TextField).first, 'đắt');
-    await tester.tap(find.widgetWithText(FilledButton, 'Tìm'));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
     expect(repository.queries.last['query'], 'đắt');
@@ -118,7 +120,7 @@ void main() {
     expect(find.text('Không tìm thấy phòng phù hợp.'), findsOneWidget);
   });
 
-  testWidgets('Áp dụng trong hộp thoại lọc đóng hộp thoại và gửi bộ lọc', (
+  testWidgets('Áp dụng trong sheet lọc đóng sheet và gửi bộ lọc', (
     tester,
   ) async {
     final repository = await _pump(tester, [
@@ -128,10 +130,10 @@ void main() {
 
     await tester.tap(find.byTooltip('Lọc phòng'));
     await tester.pumpAndSettle();
-    expect(find.text('Lọc phòng'), findsOneWidget);
+    expect(find.text('Bộ lọc phòng'), findsOneWidget);
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'Giá từ'),
+      find.widgetWithText(TextField, 'Giá từ (đ)'),
       '2.000.000',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Áp dụng'));
@@ -182,7 +184,7 @@ void main() {
     await tester.tap(find.byTooltip('Lọc phòng'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Giá từ'),
+      find.widgetWithText(TextField, 'Giá từ (đ)'),
       '2.000.000',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Áp dụng'));
@@ -190,7 +192,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Lọc phòng'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Xóa lọc'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Xóa lọc'));
     await tester.pumpAndSettle();
 
     expect(repository.queries.last, {'sort': 'newest'});

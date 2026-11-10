@@ -36,9 +36,8 @@ class AppNetworkImage extends StatelessWidget {
       height: height,
       fit: fit,
       cacheWidth: cacheWidth,
-      loadingBuilder: (context, child, progress) => progress == null
-          ? child
-          : _ImageBox(width: width, height: height),
+      loadingBuilder: (context, child, progress) =>
+          progress == null ? child : _ImageBox(width: width, height: height),
       errorBuilder: (_, _, _) =>
           errorWidget ?? _ImageBox(width: width, height: height, failed: true),
     );

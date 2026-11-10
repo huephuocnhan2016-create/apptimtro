@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/async_state_view.dart';
@@ -73,53 +74,78 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
         emptyMessage: 'Bạn chưa đặt cọc phòng nào.',
         emptyIcon: Icons.receipt_long_outlined,
         builder: (context, deposits) => ListView.separated(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpace.lg),
           itemCount: deposits.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          separatorBuilder: (_, _) => const SizedBox(height: AppSpace.md),
           itemBuilder: (context, index) {
             final deposit = deposits[index];
             return Card(
               margin: EdgeInsets.zero,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                leading: deposit.roomImage == null
-                    ? const CircleAvatar(child: Icon(Icons.apartment_outlined))
-                    : AppNetworkImage(
-                        deposit.roomImage!,
-                        width: 48,
-                        height: 48,
-                        borderRadius: BorderRadius.circular(8),
-                        errorWidget: const CircleAvatar(
-                          child: Icon(Icons.apartment_outlined),
-                        ),
-                      ),
-                title: Text(deposit.roomTitle),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(deposit.roomAddress),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Cọc ${formatVnd(deposit.amount)}'
-                      '${deposit.payDate == null ? '' : ' · ${formatDateVn(deposit.payDate!)}'}',
-                      style: Theme.of(context).textTheme.bodySmall,
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpace.md,
+                      vertical: AppSpace.sm,
                     ),
-                  ],
-                ),
-                trailing: TextButton(
-                  onPressed: _cancellingTxnRef == deposit.txnRef
-                      ? null
-                      : () => _cancel(deposit),
-                  child: Text(
-                    _cancellingTxnRef == deposit.txnRef
-                        ? 'Đang hủy…'
-                        : 'Hủy cọc',
+                    leading: deposit.roomImage == null
+                        ? const CircleAvatar(
+                            child: Icon(Icons.apartment_outlined),
+                          )
+                        : AppNetworkImage(
+                            deposit.roomImage!,
+                            width: 56,
+                            height: 56,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            errorWidget: const CircleAvatar(
+                              child: Icon(Icons.apartment_outlined),
+                            ),
+                          ),
+                    title: Text(deposit.roomTitle),
+                    subtitle: Text(deposit.roomAddress),
+                    onTap: () => context.push('/rooms/${deposit.roomId}'),
                   ),
-                ),
-                onTap: () => context.push('/rooms/${deposit.roomId}'),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpace.md,
+                      AppSpace.xs,
+                      AppSpace.xs,
+                      AppSpace.xs,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cọc ${formatVnd(deposit.amount)}',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontFeatures:
+                                          AppTypography.tabularFigures,
+                                    ),
+                              ),
+                              if (deposit.payDate != null)
+                                Text(formatDateVn(deposit.payDate!)),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _cancellingTxnRef == deposit.txnRef
+                              ? null
+                              : () => _cancel(deposit),
+                          child: Text(
+                            _cancellingTxnRef == deposit.txnRef
+                                ? 'Đang hủy…'
+                                : 'Hủy cọc',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           },

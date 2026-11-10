@@ -14,6 +14,8 @@ class AsyncStateView<T> extends StatelessWidget {
     this.onRetry,
     this.emptyMessage = 'Chưa có dữ liệu.',
     this.emptyIcon,
+    this.emptyHint,
+    this.emptyAction,
     this.isEmpty,
     super.key,
   });
@@ -35,6 +37,7 @@ class AsyncStateView<T> extends StatelessWidget {
     }
     return const AsyncSnapshot.waiting();
   }
+
   final Widget Function(BuildContext context, T data) builder;
 
   /// Ví dụ `Không tải được phòng` → hiện `Không tải được phòng: (lý do)`.
@@ -42,6 +45,8 @@ class AsyncStateView<T> extends StatelessWidget {
   final VoidCallback? onRetry;
   final String emptyMessage;
   final IconData? emptyIcon;
+  final String? emptyHint;
+  final Widget? emptyAction;
 
   /// Mặc định: rỗng khi dữ liệu là danh sách không có phần tử.
   final bool Function(T data)? isEmpty;
@@ -58,7 +63,14 @@ class AsyncStateView<T> extends StatelessWidget {
     if (!snapshot.hasData) return const LoadingStateView();
     final data = snapshot.data as T;
     final empty = isEmpty?.call(data) ?? (data is Iterable && data.isEmpty);
-    if (empty) return EmptyStateView(message: emptyMessage, icon: emptyIcon);
+    if (empty) {
+      return EmptyStateView(
+        message: emptyMessage,
+        icon: emptyIcon,
+        hint: emptyHint,
+        action: emptyAction,
+      );
+    }
     return builder(context, data);
   }
 }
@@ -84,11 +96,19 @@ class ErrorStateView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, size: 40, color: AppColors.muted),
-          const SizedBox(height: AppSpace.md),
-          Text(message, textAlign: TextAlign.center),
+          const _StateIcon(
+            icon: Icons.cloud_off_rounded,
+            color: AppColors.failure,
+            background: AppColors.failureSoft,
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
           if (onRetry != null) ...[
-            const SizedBox(height: AppSpace.lg),
+            const SizedBox(height: AppSpace.xl),
             OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
@@ -102,25 +122,77 @@ class ErrorStateView extends StatelessWidget {
 }
 
 class EmptyStateView extends StatelessWidget {
-  const EmptyStateView({required this.message, this.icon, super.key});
+  const EmptyStateView({
+    required this.message,
+    this.icon,
+    this.hint,
+    this.action,
+    super.key,
+  });
 
   final String message;
   final IconData? icon;
 
+  /// Dòng dẫn dắt ngắn dưới thông báo — state rỗng là chỗ để chỉ đường, không
+  /// phải chỗ để báo "trống".
+  final String? hint;
+  final Widget? action;
+
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpace.xxl),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 48, color: AppColors.subtle),
-            const SizedBox(height: AppSpace.md),
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              _StateIcon(
+                icon: icon!,
+                color: AppColors.muted,
+                background: AppColors.surfaceAlt,
+              ),
+              const SizedBox(height: AppSpace.lg),
+            ],
+            Text(message, textAlign: TextAlign.center, style: text.titleMedium),
+            if (hint != null) ...[
+              const SizedBox(height: AppSpace.sm),
+              Text(
+                hint!,
+                textAlign: TextAlign.center,
+                style: text.bodyMedium?.copyWith(color: AppColors.muted),
+              ),
+            ],
+            if (action != null) ...[
+              const SizedBox(height: AppSpace.xl),
+              action!,
+            ],
           ],
-          Text(message, textAlign: TextAlign.center),
-        ],
+        ),
       ),
-    ),
+    );
+  }
+}
+
+/// Biểu tượng trạng thái đặt trong ô tròn mềm — một nhịp thị giác cho mọi
+/// state rỗng/lỗi thay vì icon trơ trên nền trắng.
+class _StateIcon extends StatelessWidget {
+  const _StateIcon({
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 64,
+    height: 64,
+    decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+    child: Icon(icon, size: 28, color: color),
   );
 }

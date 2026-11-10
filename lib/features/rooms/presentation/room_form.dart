@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,8 +12,10 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../map/presentation/open_street_map_layers.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../domain/room.dart';
 
@@ -49,16 +52,18 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       'title': _controller(room?.title),
       'address': _controller(room?.address),
       'description': _controller(room?.description),
-      'price': _controller(room?.price.toString()),
-      'area': _controller(room?.area.toString()),
+      'price': _controller(_plain(room?.price)),
+      'area': _controller(_plain(room?.area)),
       'totalRooms': _controller(room?.totalRooms.toString()),
       'availableRooms': _controller(room?.availableRooms.toString()),
-      'latitude': _controller(room?.latitude.toString()),
-      'longitude': _controller(room?.longitude.toString()),
-      'electricityPrice': _controller(room?.electricityPrice.toString() ?? '0'),
-      'waterPrice': _controller(room?.waterPrice.toString() ?? '0'),
-      'internetPrice': _controller(room?.internetPrice.toString() ?? '0'),
-      'deposit': _controller(room?.deposit.toString() ?? '0'),
+      'latitude': _controller(_plain(room?.latitude)),
+      'longitude': _controller(_plain(room?.longitude)),
+      'electricityPrice': _controller(
+        _plain(room?.electricityPrice, empty: '0'),
+      ),
+      'waterPrice': _controller(_plain(room?.waterPrice, empty: '0')),
+      'internetPrice': _controller(_plain(room?.internetPrice, empty: '0')),
+      'deposit': _controller(_plain(room?.deposit, empty: '0')),
       'amenities': _controller(room?.amenities.join(', ')),
     };
     final latitude = room?.latitude;
@@ -67,10 +72,24 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       _mapPosition = LatLng(latitude, longitude);
     }
     _fields['address']!.addListener(_onAddressChanged);
+    // Ô tiến độ phòng trống vẽ lại ngay khi chủ trọ gõ số.
+    for (final name in ['totalRooms', 'availableRooms']) {
+      _fields[name]!.addListener(_onCountsChanged);
+    }
+  }
+
+  void _onCountsChanged() {
+    if (mounted) setState(() {});
   }
 
   TextEditingController _controller(String? text) =>
       TextEditingController(text: text ?? '');
+
+  /// Số nguyên không giữ đuôi ".0" và không hiện chữ "null" trong ô nhập.
+  String _plain(double? value, {String empty = ''}) {
+    if (value == null) return empty;
+    return value % 1 == 0 ? value.toInt().toString() : value.toString();
+  }
 
   @override
   void dispose() {
@@ -83,99 +102,243 @@ class _RoomFormState extends ConsumerState<RoomForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Form(
-    key: _formKey,
-    child: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        SectionCard(
-          title: 'Thông tin phòng',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _text('title', 'Tên phòng', required: true),
-              _text('description', 'Mô tả', maxLines: 4),
-              _text('amenities', 'Tiện ích (phân cách bằng dấu phẩy)'),
-            ],
-          ),
+  Widget build(BuildContext context) => Scaffold(
+    body: Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpace.lg,
+          AppSpace.lg,
+          AppSpace.lg,
+          AppSpace.xxl,
         ),
-        SectionCard(
-          title: 'Chi phí',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _number('price', 'Giá thuê (đ/tháng)', required: true),
-              _number('area', 'Diện tích (m²)', required: true),
-              _number('totalRooms', 'Tổng số phòng', required: true, integer: true),
-              _number('availableRooms', 'Số phòng còn', required: true, integer: true),
-              _number('electricityPrice', 'Tiền điện (đ/kWh)'),
-              _number('waterPrice', 'Tiền nước (đ/tháng)'),
-              _number('internetPrice', 'Internet (đ/tháng)'),
-              _number('deposit', 'Tiền cọc (đ)'),
-            ],
+        children: [
+          SectionCard(
+            title: 'Thông tin phòng',
+            subtitle: 'Sinh viên đọc phần này đầu tiên',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _text('title', 'Tên phòng', required: true),
+                _text('description', 'Mô tả', maxLines: 4),
+                _AmenityPicker(controller: _fields['amenities']!),
+              ],
+            ),
           ),
-        ),
-        SectionCard(
-          title: 'Vị trí',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _text(
-                'address',
-                'Địa chỉ',
-                required: true,
-                helperText:
-                    'Nhập địa chỉ; nếu thiết bị không tìm được tọa độ, máy chủ sẽ thử tìm khi lưu.',
-              ),
-              _locationPreview(),
-              OutlinedButton.icon(
-                onPressed: _gettingCurrentLocation ? null : _useCurrentLocation,
-                icon: const Icon(Icons.my_location),
-                label: Text(
-                  _gettingCurrentLocation
-                      ? 'Đang lấy vị trí...'
-                      : 'Dùng vị trí GPS hiện tại',
+          SectionCard(
+            title: 'Chi phí',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _number('price', 'Giá thuê (đ/tháng)', required: true),
+                _twoColumns(
+                  _number('area', 'Diện tích (m²)', required: true),
+                  _number('deposit', 'Tiền cọc (đ)'),
                 ),
-              ),
-              OutlinedButton.icon(
-                onPressed: _pickLocation,
-                icon: const Icon(Icons.map_outlined),
-                label: const Text('Chỉnh vị trí trên bản đồ'),
-              ),
-            ],
-          ),
-        ),
-        SectionCard(
-          title: 'Hình ảnh',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _pickImages,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: Text(
-                  _images.isEmpty
-                      ? 'Chọn ảnh phòng'
-                      : 'Đã chọn ${_images.length} ảnh',
+                _twoColumns(
+                  _number('electricityPrice', 'Tiền điện (đ/kWh)'),
+                  _number('waterPrice', 'Tiền nước (đ/tháng)'),
                 ),
-              ),
-              if (widget.room?.images.isNotEmpty ?? false)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text('Ảnh hiện tại: ${widget.room!.images.length}'),
-                ),
-            ],
+                _number('internetPrice', 'Internet (đ/tháng)'),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        AppButton(
+          SectionCard(
+            title: 'Quy mô',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _twoColumns(
+                  _number(
+                    'totalRooms',
+                    'Tổng số phòng',
+                    required: true,
+                    integer: true,
+                  ),
+                  _number(
+                    'availableRooms',
+                    'Số phòng còn',
+                    required: true,
+                    integer: true,
+                  ),
+                ),
+                _occupancyHint(),
+              ],
+            ),
+          ),
+          SectionCard(
+            title: 'Vị trí',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _text(
+                  'address',
+                  'Địa chỉ',
+                  required: true,
+                  helperText:
+                      'Không có GPS vẫn lưu được: máy chủ tự tìm tọa độ.',
+                ),
+                _locationPreview(),
+                FilledButton.tonalIcon(
+                  onPressed: _gettingCurrentLocation
+                      ? null
+                      : _useCurrentLocation,
+                  icon: Icon(
+                    _gettingCurrentLocation
+                        ? Icons.hourglass_empty_rounded
+                        : Icons.my_location,
+                  ),
+                  label: Text(
+                    _gettingCurrentLocation
+                        ? 'Đang lấy vị trí...'
+                        : 'Dùng vị trí GPS hiện tại',
+                  ),
+                ),
+                const SizedBox(height: AppSpace.sm),
+                OutlinedButton.icon(
+                  onPressed: _pickLocation,
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text('Chỉnh vị trí trên bản đồ'),
+                ),
+              ],
+            ),
+          ),
+          _imageCard(),
+        ],
+      ),
+    ),
+    bottomNavigationBar: _saveBar(),
+  );
+
+  Widget _saveBar() => Container(
+    decoration: const BoxDecoration(
+      color: AppColors.surface,
+      border: Border(top: BorderSide(color: AppColors.border)),
+    ),
+    child: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.md),
+        child: AppButton(
           label: widget.room == null ? 'Tạo phòng' : 'Lưu thay đổi',
           busy: _saving,
           onPressed: _save,
         ),
-      ],
+      ),
     ),
   );
+
+  Widget _imageCard() {
+    final existing = widget.room?.images ?? const <String>[];
+    return SectionCard(
+      title: 'Hình ảnh',
+      subtitle: 'Tin đăng có ảnh thật dễ được liên hệ hơn',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (existing.isNotEmpty) ...[
+            Text(
+              'Ảnh đang hiển thị (${existing.length})',
+              style: Theme.of(context).textTheme.labelMedium
+                  ?.copyWith(color: AppColors.muted),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: existing.length,
+                separatorBuilder: (_, _) => const SizedBox(width: AppSpace.sm),
+                itemBuilder: (context, index) => AppNetworkImage(
+                  existing[index],
+                  width: 96,
+                  height: 72,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpace.lg),
+          ],
+          OutlinedButton.icon(
+            onPressed: _pickImages,
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: Text(
+              _images.isEmpty
+                  ? 'Chọn ảnh phòng'
+                  : 'Chọn thêm ảnh (${_images.length} ảnh mới)',
+            ),
+          ),
+          if (_images.isNotEmpty) ...[
+            const SizedBox(height: AppSpace.md),
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: AppSpace.sm,
+              crossAxisSpacing: AppSpace.sm,
+              children: [
+                for (var i = 0; i < _images.length; i++)
+                  _PickedImage(
+                    path: _images[i].path,
+                    onRemove: () => setState(() => _images.removeAt(i)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Text(
+              'Ảnh mới sẽ được tải lên khi bạn lưu phòng.',
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.muted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _twoColumns(Widget left, Widget right) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(child: left),
+      const SizedBox(width: AppSpace.md),
+      Expanded(child: right),
+    ],
+  );
+
+  Widget _occupancyHint() {
+    final total = int.tryParse(_fields['totalRooms']!.text.trim());
+    final available = int.tryParse(_fields['availableRooms']!.text.trim());
+    if (total == null || available == null || total == 0) {
+      return const SizedBox(height: AppSpace.sm);
+    }
+    final shown = available.clamp(0, total);
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.xs),
+      child: Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              child: LinearProgressIndicator(
+                value: shown / total,
+                minHeight: 6,
+                backgroundColor: AppColors.neutralSoft,
+                color: AppColors.brand,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpace.md),
+          Text(
+            'Còn $shown/$total phòng trống',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: AppColors.muted,
+              fontFeatures: AppTypography.tabularFigures,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _text(
     String name,
@@ -184,7 +347,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
     int maxLines = 1,
     String? helperText,
   }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.only(bottom: AppSpace.md),
     child: TextFormField(
       controller: _fields[name],
       maxLines: maxLines,
@@ -200,12 +363,12 @@ class _RoomFormState extends ConsumerState<RoomForm> {
   Widget _locationPreview() {
     final position = _mapPosition;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             child: SizedBox(
               height: 210,
               child: FlutterMap(
@@ -224,9 +387,9 @@ class _RoomFormState extends ConsumerState<RoomForm> {
                           point: selected,
                           width: 44,
                           height: 44,
-                          child: Icon(
-                            Icons.location_on,
-                            color: Theme.of(context).colorScheme.error,
+                          child: const Icon(
+                            Icons.location_pin,
+                            color: AppColors.brand,
                             size: 40,
                           ),
                         ),
@@ -237,7 +400,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpace.sm),
           if (_resolvingAddress)
             const Row(
               children: [
@@ -246,23 +409,43 @@ class _RoomFormState extends ConsumerState<RoomForm> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: AppSpace.sm),
                 Text('Đang tìm vị trí địa chỉ...'),
               ],
             )
           else if (_addressError != null)
-            Text(
-              _addressError!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 16,
+                  color: AppColors.warningIcon,
+                ),
+                const SizedBox(width: AppSpace.sm),
+                Expanded(
+                  child: Text(
+                    _addressError!,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.warningInk),
+                  ),
+                ),
+              ],
             )
           else if (position != null)
             Text(
               'Tọa độ: ${position.latitude.toStringAsFixed(6)}, '
               '${position.longitude.toStringAsFixed(6)}. '
               'Chạm vào bản đồ để chỉnh lại.',
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.muted),
             )
           else
-            const Text('Địa chỉ đã nhập sẽ được lưu cùng tin đăng.'),
+            Text(
+              'Địa chỉ đã nhập sẽ được lưu cùng tin đăng.',
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.muted),
+            ),
         ],
       ),
     );
@@ -369,7 +552,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
     bool required = false,
     bool integer = false,
   }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.only(bottom: AppSpace.md),
     child: TextFormField(
       controller: _fields[name],
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -393,6 +576,12 @@ class _RoomFormState extends ConsumerState<RoomForm> {
         if (name == 'area' && number != null && number == 0) {
           return 'Diện tích phải lớn hơn 0';
         }
+        if (name == 'availableRooms' && number != null) {
+          final total = int.tryParse(_fields['totalRooms']!.text.trim());
+          if (total != null && number > total) {
+            return 'Không vượt tổng số phòng';
+          }
+        }
         return null;
       },
     ),
@@ -413,14 +602,6 @@ class _RoomFormState extends ConsumerState<RoomForm> {
     if (!_formKey.currentState!.validate()) return;
     final total = int.parse(_fields['totalRooms']!.text);
     final available = int.parse(_fields['availableRooms']!.text);
-    if (available > total) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Số phòng còn không thể lớn hơn tổng số phòng.'),
-        ),
-      );
-      return;
-    }
     setState(() => _saving = true);
     try {
       final data = <String, Object?>{
@@ -490,10 +671,10 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
-          SnackBar(content: Text('Không thể lưu phòng: ${apiErrorMessage(error)}')),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể lưu phòng: ${apiErrorMessage(error)}'),
+          ),
         );
       }
     } finally {
@@ -521,5 +702,166 @@ class EditRoomScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Chỉnh sửa phòng')),
     body: RoomForm(room: room),
+  );
+}
+
+/// Chọn tiện ích bằng cách chạm. Giá trị vẫn lưu dưới dạng chuỗi phân cách dấu
+/// phẩy như cũ nên phần lưu phòng không đổi.
+class _AmenityPicker extends StatefulWidget {
+  const _AmenityPicker({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  State<_AmenityPicker> createState() => _AmenityPickerState();
+}
+
+class _AmenityPickerState extends State<_AmenityPicker> {
+  static const _presets = [
+    'Wifi',
+    'Điều hòa',
+    'Nước nóng',
+    'Máy giặt',
+    'Chỗ để xe',
+    'Giờ tự do',
+    'Thang máy',
+    'Khu nấu ăn',
+    'Camera an ninh',
+    'Ban công',
+    'Nhà vệ sinh khép kín',
+    'Gần trường đại học',
+    'Gần khu công nghiệp',
+  ];
+
+  final _custom = TextEditingController();
+
+  List<String> get _selected => widget.controller.text
+      .split(',')
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onChanged);
+    _custom.dispose();
+    super.dispose();
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _toggle(String value) {
+    final values = _selected;
+    if (!values.remove(value)) values.add(value);
+    widget.controller.text = values.join(', ');
+  }
+
+  void _addCustom() {
+    final value = _custom.text.trim();
+    if (value.isEmpty) return;
+    final values = _selected;
+    if (!values.contains(value)) values.add(value);
+    widget.controller.text = values.join(', ');
+    _custom.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _selected;
+    final options = <String>[
+      ..._presets,
+      ...selected.where((value) => !_presets.contains(value)),
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tiện ích',
+            style: Theme.of(context).textTheme.labelLarge
+                ?.copyWith(color: AppColors.muted),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final option in options)
+                FilterChip(
+                  label: Text(option),
+                  selected: selected.contains(option),
+                  onSelected: (_) => _toggle(option),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.md),
+          TextField(
+            controller: _custom,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _addCustom(),
+            decoration: InputDecoration(
+              labelText: 'Tiện ích khác',
+              hintText: 'VD: ban công rộng',
+              suffixIcon: IconButton(
+                tooltip: 'Thêm tiện ích',
+                icon: const Icon(Icons.add),
+                onPressed: _addCustom,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ảnh vừa chọn trên máy, bấm để bỏ trước khi lưu.
+class _PickedImage extends StatelessWidget {
+  const _PickedImage({required this.path, required this.onRemove});
+
+  final String path;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Image.file(
+          File(path),
+          fit: BoxFit.cover,
+          cacheWidth: 200,
+          errorBuilder: (_, _, _) => const ColoredBox(
+            color: AppColors.surfaceAlt,
+            child: Icon(Icons.broken_image_outlined, color: AppColors.subtle),
+          ),
+        ),
+      ),
+      Positioned(
+        right: 0,
+        top: 0,
+        child: IconButton(
+          tooltip: 'Bỏ ảnh này',
+          iconSize: 16,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          color: AppColors.onBrand,
+          icon: const Icon(Icons.close_rounded),
+          style: IconButton.styleFrom(backgroundColor: AppColors.scrim),
+          onPressed: onRemove,
+        ),
+      ),
+    ],
   );
 }

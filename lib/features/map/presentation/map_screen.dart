@@ -91,26 +91,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final markers = _rooms
         .where((room) => room.latitude != null && room.longitude != null)
         .map(
           (room) => Marker(
             point: LatLng(room.latitude!, room.longitude!),
-            width: 48,
-            height: 48,
-            child: IconButton(
-              tooltip: room.title,
-              onPressed: () {
-                setState(() => _selectedRoomId = room.id);
-                _showRoom(room);
-              },
-              icon: Icon(
-                room.id == _selectedRoomId ? Icons.push_pin : Icons.location_on,
-                size: 42,
-                color: room.id == _selectedRoomId
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.error,
+            width: 84,
+            height: 36,
+            child: Center(
+              child: _PriceMarker(
+                room: room,
+                selected: room.id == _selectedRoomId,
+                onTap: () {
+                  setState(() => _selectedRoomId = room.id);
+                  _showRoom(room);
+                },
               ),
             ),
           ),
@@ -129,7 +124,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           IconButton(
             tooltip: 'Bán kính tìm kiếm',
             onPressed: _chooseRadius,
-            icon: const Icon(Icons.tune),
+            icon: Badge(
+              isLabelVisible: _radiusKm != 30,
+              label: Text(_radiusKm.toStringAsFixed(0)),
+              child: const Icon(Icons.tune),
+            ),
           ),
         ],
       ),
@@ -155,28 +154,39 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
             children: [
               openStreetMapTileLayer(),
-              MarkerLayer(markers: markers),
+              // Vị trí của bạn vẽ trước ghim phòng: hai điểm trùng nhau thì
+              // nhãn giá vẫn nằm trên và vẫn bấm được.
               if (_currentPosition case final current?)
                 MarkerLayer(
                   markers: [
                     Marker(
                       point: current,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(
-                        Icons.my_location,
-                        color: AppColors.mapCurrentLocation,
-                        size: 30,
+                      width: 24,
+                      height: 24,
+                      child: Center(
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppColors.mapCurrentLocation,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.surface,
+                              width: 2,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
+              MarkerLayer(markers: markers),
               openStreetMapAttribution(),
             ],
           ),
           Positioned(
-            right: 16,
-            bottom: 20,
+            right: AppSpace.lg,
+            bottom: AppSpace.xxl,
             child: FloatingActionButton.small(
               tooltip: 'Vị trí hiện tại',
               onPressed: _loading
@@ -193,19 +203,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           if (_currentPosition != null)
             Positioned(
-              left: 16,
+              left: AppSpace.lg,
               right: 72,
-              bottom: 20,
+              bottom: AppSpace.xxl,
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+                    horizontal: AppSpace.md,
+                    vertical: AppSpace.sm,
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.place_outlined, size: 20),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpace.sm),
                       Expanded(
                         child: Text(
                           _currentAddress ?? 'Đang xác định địa chỉ...',
@@ -221,7 +231,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           if (_areaNeedsSearch && !_loading)
             Positioned(
-              top: 12,
+              top: AppSpace.md,
               left: 0,
               right: 0,
               child: Center(
@@ -241,9 +251,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             Align(
               alignment: Alignment.topCenter,
               child: Card(
-                margin: const EdgeInsets.all(12),
+                margin: const EdgeInsets.all(AppSpace.md),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpace.md),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -267,8 +277,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             Align(
               alignment: Alignment.topCenter,
               child: Card(
+                margin: const EdgeInsets.all(AppSpace.md),
                 child: Padding(
-                  padding: EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpace.md),
                   child: Text(
                     'Không tìm thấy phòng trong bán kính ${_radiusKm.toStringAsFixed(0)} km.',
                   ),
@@ -287,7 +298,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpace.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -304,6 +315,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   label: '${selected.toStringAsFixed(0)} km',
                   onChanged: (value) => setSheetState(() => selected = value),
                 ),
+                const SizedBox(height: AppSpace.sm),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, selected),
                   child: const Text('Áp dụng'),
@@ -358,19 +370,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.lg,
+            0,
+            AppSpace.lg,
+            AppSpace.lg,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (room.image != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: AppSpace.md),
                   child: AppNetworkImage(
                     room.image!,
-                    height: 150,
+                    height: 160,
                     width: double.infinity,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
@@ -382,28 +400,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpace.md),
               Row(
                 children: [
                   Text(
-                    '${formatVnd(room.price)}/tháng',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    formatVnd(room.price),
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontFeatures: AppTypography.tabularFigures),
                   ),
+                  Text('/tháng', style: Theme.of(context).textTheme.bodyMedium),
                   const Spacer(),
-                  Text(
-                    'Còn ${room.availableRooms} phòng',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  Text('Còn ${room.availableRooms} phòng'),
                 ],
               ),
               if (room.distance != null)
-                Text(
-                  'Cách bạn ${room.distance!.toStringAsFixed(1)} km',
-                  style: Theme.of(context).textTheme.bodySmall,
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpace.xs),
+                  child: Text(
+                    'Cách bạn ${room.distance!.toStringAsFixed(1)} km',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpace.lg),
               FilledButton(
                 onPressed: () {
                   Navigator.pop(context);
@@ -417,6 +435,53 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
     );
   }
+}
+
+/// Giá rút gọn cho marker: "2,5 tr" vẫn đọc được khi nhiều ghim đè nhau.
+String _shortPrice(double price) => price >= 1000000
+    ? '${formatNumber(price / 1000000)} tr'
+    : '${formatNumber(price / 1000)} k';
+
+/// Ghim giá kiểu marketplace: con số ngay trên bản đồ thay vì một cây ghim
+/// vô danh, người dùng so được giá mà chưa cần mở phòng.
+class _PriceMarker extends StatelessWidget {
+  const _PriceMarker({
+    required this.room,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Room room;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: selected ? AppColors.brand : AppColors.surface,
+    clipBehavior: Clip.antiAlias,
+    shape: StadiumBorder(
+      side: BorderSide(
+        color: selected ? AppColors.brand : AppColors.border,
+        width: 1.5,
+      ),
+    ),
+    elevation: 2,
+    shadowColor: AppColors.shadow,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.xs,
+        ),
+        child: Text(
+          _shortPrice(room.price),
+          style: Theme.of(context).textTheme.labelMedium
+              ?.copyWith(color: selected ? AppColors.onBrand : AppColors.ink),
+        ),
+      ),
+    ),
+  );
 }
 
 class MapPickerScreen extends StatefulWidget {
@@ -448,31 +513,56 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         ),
       ],
     ),
-    body: FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: _initial,
-        initialZoom: 12,
-        onTap: (_, point) => setState(() => _selected = point),
-      ),
+    body: Stack(
       children: [
-        openStreetMapTileLayer(),
-        if (_selected case final selected?)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: selected,
-                width: 48,
-                height: 48,
-                child: Icon(
-                  Icons.location_on,
-                  size: 42,
-                  color: Theme.of(context).colorScheme.error,
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _initial,
+            initialZoom: 12,
+            onTap: (_, point) => setState(() => _selected = point),
+          ),
+          children: [
+            openStreetMapTileLayer(),
+            if (_selected case final selected?)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: selected,
+                    width: 48,
+                    height: 48,
+                    child: const Icon(
+                      Icons.location_pin,
+                      size: 42,
+                      color: AppColors.brand,
+                    ),
+                  ),
+                ],
+              ),
+            openStreetMapAttribution(),
+          ],
+        ),
+        Positioned(
+          top: AppSpace.md,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.md,
+                  vertical: AppSpace.sm,
+                ),
+                child: Text(
+                  _selected == null
+                      ? 'Chạm vào bản đồ để đặt vị trí phòng'
+                      : 'Đã chọn vị trí, bấm Chọn để lưu',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-            ],
+            ),
           ),
-        openStreetMapAttribution(),
+        ),
       ],
     ),
   );

@@ -204,7 +204,9 @@ class PaymentController extends Notifier<PaymentState> {
     if (!ref.mounted) return;
     state = state.copyWith(
       launching: false,
-      error: opened ? state.error : 'Không mở được cổng thanh toán $portalName.',
+      error: opened
+          ? state.error
+          : 'Không mở được cổng thanh toán $portalName.',
     );
   }
 

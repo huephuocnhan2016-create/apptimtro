@@ -39,16 +39,17 @@ class LocationService {
     String normalize(String value) =>
         value.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
 
-    final parts = [
-      placemark.street,
-      placemark.subLocality,
-      placemark.locality,
-      placemark.administrativeArea,
-    ]
-        .whereType<String>()
-        .expand((part) => part.split(','))
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty);
+    final parts =
+        [
+              placemark.street,
+              placemark.subLocality,
+              placemark.locality,
+              placemark.administrativeArea,
+            ]
+            .whereType<String>()
+            .expand((part) => part.split(','))
+            .map((part) => part.trim())
+            .where((part) => part.isNotEmpty);
 
     final address = <String>[];
     for (final part in parts) {

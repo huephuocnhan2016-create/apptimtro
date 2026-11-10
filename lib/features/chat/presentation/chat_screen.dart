@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../rooms/domain/room.dart';
 import '../../../shared/format.dart';
+import '../../../shared/widgets/async_state_view.dart';
 import '../domain/message.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -147,11 +149,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     );
                   }
                   final messages = snapshot.data ?? const <Message>[];
+                  if (messages.isEmpty) {
+                    return const EmptyStateView(
+                      message: 'Chưa có tin nhắn nào.',
+                      icon: Icons.forum_outlined,
+                      hint: 'Hỏi chủ trọ về giá, giờ xem phòng và cọc để mở đầu câu chuyện.',
+                    );
+                  }
                   return ListView(
                     reverse: true,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                      horizontal: AppSpace.md,
+                      vertical: AppSpace.sm,
                     ),
                     children: [
                       for (final message in messages)
@@ -166,29 +175,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        minLines: 1,
-                        maxLines: 4,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          hintText: 'Nhắn tin…',
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpace.md,
+                    AppSpace.xs,
+                    AppSpace.md,
+                    AppSpace.md,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          minLines: 1,
+                          maxLines: 4,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            hintText: 'Nhắn tin…',
+                          ),
+                          onSubmitted: (_) => _send(session),
                         ),
-                        onSubmitted: (_) => _send(session),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      icon: const Icon(Icons.send),
-                      tooltip: 'Gửi',
-                      onPressed: () => _send(session),
-                    ),
-                  ],
+                      const SizedBox(width: AppSpace.sm),
+                      IconButton.filled(
+                        icon: const Icon(Icons.send),
+                        tooltip: 'Gửi',
+                        onPressed: () => _send(session),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -213,29 +233,49 @@ class _MessageBubble extends StatelessWidget {
         : formatTimeVn(message.createdAt!);
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: const BoxConstraints(maxWidth: 320),
-        decoration: BoxDecoration(
-          color: isMine
-              ? theme.colorScheme.primaryContainer
-              : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(14),
+      child: ConstrainedBox(
+        // Bubble ôm lấy chữ: tin ngắn mà chiếm hết 82% ngang thì khoảng trống
+        // trong bubble lớn hơn cả nội dung.
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
         ),
-        child: Column(
-          crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message.text),
-            if (time.isNotEmpty)
-              Text(
-                time,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.md,
+            vertical: AppSpace.sm,
+          ),
+          decoration: BoxDecoration(
+            color: isMine
+                ? theme.colorScheme.primaryContainer
+                : theme.colorScheme.surfaceContainerHighest,
+            // Bo góc bất đối xứng ở góc gần tên người gửi: nhìn bubble là biết
+            // ai nói, không phải đọc màu.
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(AppRadius.lg),
+              topRight: const Radius.circular(AppRadius.lg),
+              bottomLeft: Radius.circular(isMine ? AppRadius.lg : AppRadius.sm),
+              bottomRight: Radius.circular(
+                isMine ? AppRadius.sm : AppRadius.lg,
               ),
-          ],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: isMine
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(message.text),
+              if (time.isNotEmpty)
+                Text(
+                  time,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

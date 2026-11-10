@@ -40,10 +40,7 @@ class MessageRepository {
     final doc = _conversations.doc(conversationId);
     final snapshot = await doc.get();
     if (snapshot.exists) return;
-    await doc.set({
-      'participantIds': participantIds,
-      'roomId': roomId,
-    });
+    await doc.set({'participantIds': participantIds, 'roomId': roomId});
   }
 
   Stream<List<Message>> messages(String conversationId) => _conversations

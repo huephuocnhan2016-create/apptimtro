@@ -11,7 +11,8 @@ RichAttributionWidget openStreetMapAttribution() => RichAttributionWidget(
   attributions: [
     TextSourceAttribution(
       'OpenStreetMap contributors',
-      onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
+      onTap: () =>
+          launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
     ),
   ],
 );

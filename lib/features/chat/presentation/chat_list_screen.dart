@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/async_state_view.dart';
@@ -23,52 +24,63 @@ class ChatListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(title: const Text('Cuộc trò chuyện')),
     body: AsyncStateView<List<ChatConversation>>(
-        snapshot: AsyncStateView.snapshotOf(ref.watch(conversationsProvider)),
-        errorPrefix: 'Không tải được danh sách chat',
-        onRetry: () => ref.invalidate(conversationsProvider),
-        emptyMessage:
-            'Chưa có cuộc trò chuyện nào.\nVào Mục yêu thích và bấm icon chat để bắt đầu.',
-        emptyIcon: Icons.chat_bubble_outline,
-        builder: (context, conversations) => RefreshIndicator(
-          onRefresh: () => ref.refresh(conversationsProvider.future),
-          child: ListView.separated(
+      snapshot: AsyncStateView.snapshotOf(ref.watch(conversationsProvider)),
+      errorPrefix: 'Không tải được danh sách chat',
+      onRetry: () => ref.invalidate(conversationsProvider),
+      emptyMessage: 'Chưa có cuộc trò chuyện nào.',
+      emptyHint: 'Mở một phòng trọ rồi bấm icon chat để hỏi chủ trọ.',
+      emptyIcon: Icons.chat_bubble_outline,
+      emptyAction: FilledButton.tonal(
+        onPressed: () => context.push('/rooms/search'),
+        child: const Text('Tìm phòng trọ'),
+      ),
+      builder: (context, conversations) => RefreshIndicator(
+        onRefresh: () => ref.refresh(conversationsProvider.future),
+        child: ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpace.md),
           itemCount: conversations.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          separatorBuilder: (_, _) => const SizedBox(height: AppSpace.sm),
           itemBuilder: (context, index) {
             final conversation = conversations[index];
             return Card(
               margin: EdgeInsets.zero,
               child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.md,
+                  vertical: AppSpace.sm,
+                ),
                 leading: _Avatar(conversation: conversation),
                 title: Text(
                   conversation.participantName ?? 'Người dùng',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                subtitle: Row(
                   children: [
-                    Text(
-                      conversation.roomTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Expanded(
+                      child: Text(
+                        conversation.roomTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    if (conversation.createdAt != null)
+                    if (conversation.createdAt != null) ...[
+                      const SizedBox(width: AppSpace.sm),
                       Text(
                         formatDateVn(conversation.createdAt!),
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
+                    ],
                   ],
                 ),
-                trailing: const Icon(Icons.chat_bubble_outline),
+                trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/chats/thread', extra: conversation),
               ),
             );
           },
-          ),
         ),
+      ),
     ),
   );
 }
@@ -80,8 +92,8 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = conversation.participantAvatarUrl ??
-        conversation.roomImageUrl;
+    final imageUrl =
+        conversation.participantAvatarUrl ?? conversation.roomImageUrl;
     if (imageUrl == null) {
       return CircleAvatar(
         child: Text(

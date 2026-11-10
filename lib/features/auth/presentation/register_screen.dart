@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../domain/user.dart';
 import 'auth_controller.dart';
@@ -49,12 +50,11 @@ class StudentRegisterScreen extends ConsumerStatefulWidget {
 
 class _StudentRegisterScreenState extends ConsumerState<StudentRegisterScreen> {
   final _name = TextEditingController();
+  bool _showError = false;
 
   Future<void> _submit() async {
     if (_name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập họ tên.')),
-      );
+      setState(() => _showError = true);
       return;
     }
     await _submitRegistration(
@@ -79,14 +79,23 @@ class _StudentRegisterScreenState extends ConsumerState<StudentRegisterScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _VerifiedNotice(phone: widget.phone),
+        const SizedBox(height: AppSpace.xl),
         TextField(
           controller: _name,
+          autofocus: true,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.done,
+          onChanged: (_) {
+            if (_showError) setState(() => _showError = false);
+          },
           onSubmitted: (_) => _submit(),
-          decoration: const InputDecoration(labelText: 'Họ và tên'),
+          decoration: InputDecoration(
+            labelText: 'Họ và tên',
+            errorText: _showError ? 'Vui lòng nhập họ tên.' : null,
+          ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpace.xl),
         AppButton(
           label: 'Hoàn tất đăng ký',
           busy: ref.watch(authControllerProvider).isLoading,
@@ -114,12 +123,18 @@ class _LandlordRegisterScreenState
     extends ConsumerState<LandlordRegisterScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
+  bool _showNameError = false;
+  bool _showEmailError = false;
+
+  bool get _nameInvalid => _name.text.trim().isEmpty;
+  bool get _emailInvalid => !_email.text.contains('@');
 
   Future<void> _submit() async {
-    if (_name.text.trim().isEmpty || !_email.text.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập họ tên và email hợp lệ.')),
-      );
+    if (_nameInvalid || _emailInvalid) {
+      setState(() {
+        _showNameError = _nameInvalid;
+        _showEmailError = _emailInvalid;
+      });
       return;
     }
     await _submitRegistration(
@@ -146,21 +161,41 @@ class _LandlordRegisterScreenState
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _VerifiedNotice(phone: widget.phone),
+        const SizedBox(height: AppSpace.xl),
         TextField(
           controller: _name,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(labelText: 'Họ và tên'),
+          onChanged: (_) {
+            if (_showNameError) setState(() => _showNameError = false);
+          },
+          decoration: InputDecoration(
+            labelText: 'Họ và tên',
+            errorText: _showNameError ? 'Vui lòng nhập họ tên.' : null,
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpace.md),
         TextField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.done,
+          onChanged: (_) {
+            if (_showEmailError) setState(() => _showEmailError = false);
+          },
           onSubmitted: (_) => _submit(),
-          decoration: const InputDecoration(labelText: 'Email'),
+          decoration: InputDecoration(
+            labelText: 'Email',
+            errorText: _showEmailError ? 'Email chưa đúng.' : null,
+          ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpace.lg),
+        Text(
+          'Bạn sẽ dùng tài khoản này để đăng và quản lý phòng trọ.',
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: AppColors.muted),
+        ),
+        const SizedBox(height: AppSpace.lg),
         AppButton(
           label: 'Hoàn tất đăng ký',
           busy: ref.watch(authControllerProvider).isLoading,
@@ -168,5 +203,33 @@ class _LandlordRegisterScreenState
         ),
       ],
     ),
+  );
+}
+
+/// Dấu xác minh đã hoàn tất — bước cuối của đăng ký nên nói cho người dùng biết
+/// họ đã đi được tới đâu thay vì để form tự hỏi.
+class _VerifiedNotice extends StatelessWidget {
+  const _VerifiedNotice({required this.phone});
+
+  final String phone;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      const Icon(Icons.verified_rounded, color: AppColors.success, size: 20),
+      const SizedBox(width: AppSpace.sm),
+      Expanded(
+        child: Text(
+          'Đã xác minh số điện thoại',
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: AppColors.muted),
+        ),
+      ),
+      Text(
+        phone,
+        style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(fontFeatures: AppTypography.tabularFigures),
+      ),
+    ],
   );
 }

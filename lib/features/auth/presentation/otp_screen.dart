@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../domain/user.dart';
 import 'auth_controller.dart';
@@ -61,18 +63,19 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text('Mã xác thực sẽ được gửi đến số điện thoại này.'),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpace.xl),
         TextField(
           controller: _phone,
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.telephoneNumberNational],
           onSubmitted: (_) => _send(),
           decoration: const InputDecoration(
             labelText: 'Số điện thoại',
             prefixText: '+84  ',
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpace.xl),
         AppButton(
           label: 'Gửi mã xác thực',
           busy: ref.watch(authControllerProvider).isLoading,
@@ -172,9 +175,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       _devOtp = sent.devOtp;
       _startCountdown();
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã gửi lại mã OTP.')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Đã gửi lại mã OTP.')));
   }
 
   void _changePhone() {
@@ -201,25 +203,30 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Mã OTP gồm 6 chữ số đã gửi đến ${widget.phone}'),
-          if (devOtp != null) ...[
-            const SizedBox(height: 12),
-            SelectableText(
-              'Mã OTP phát triển: $devOtp',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+          Text.rich(
+            TextSpan(
+              text: 'Mã OTP gồm 6 chữ số đã gửi đến ',
+              children: [
+                TextSpan(
+                  text: widget.phone,
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontFeatures: AppTypography.tabularFigures),
+                ),
+              ],
             ),
+          ),
+          if (devOtp != null) ...[
+            const SizedBox(height: AppSpace.lg),
+            _DevOtpBanner(devOtp: devOtp),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpace.xxl),
           Pinput(
             length: 6,
             controller: _pin,
             keyboardType: TextInputType.number,
             onCompleted: (_) => _verify(),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpace.xxl),
           AppButton(label: 'Xác nhận', busy: busy, onPressed: _verify),
           Row(
             children: [
@@ -241,4 +248,56 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       ),
     );
   }
+}
+
+/// Mã OTP bản dev hiện ngay trên màn hình — bấm để copy, khỏi phải nhìn hai
+/// lần giữa ứng dụng và backend.
+class _DevOtpBanner extends StatelessWidget {
+  const _DevOtpBanner({required this.devOtp});
+
+  final String devOtp;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpace.lg,
+      vertical: AppSpace.md,
+    ),
+    decoration: BoxDecoration(
+      color: AppColors.warningSurface,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      border: Border.all(color: AppColors.warningSoft),
+    ),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.vpn_key_outlined,
+          size: 18,
+          color: AppColors.warningInk,
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+          child: SelectableText(
+            'Mã OTP phát triển: $devOtp',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.warningInk,
+              fontWeight: FontWeight.w600,
+              fontFeatures: AppTypography.tabularFigures,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Copy mã',
+          icon: const Icon(Icons.copy_all_outlined, size: 18),
+          color: AppColors.warningInk,
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: devOtp));
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('Đã copy mã OTP.')));
+          },
+        ),
+      ],
+    ),
+  );
 }

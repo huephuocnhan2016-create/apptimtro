@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_theme.dart';
+
 /// Một khối nội dung có tiêu đề — trong Android đây là `Card` chứa các dòng
 /// `TextView`/`ListView`, không tự vẽ bóng hay bo góc riêng.
 class SectionCard extends StatelessWidget {
@@ -8,6 +10,7 @@ class SectionCard extends StatelessWidget {
     required this.child,
     this.subtitle,
     this.trailing,
+    this.background,
     super.key,
   });
 
@@ -16,13 +19,21 @@ class SectionCard extends StatelessWidget {
   final Widget? trailing;
   final Widget child;
 
+  /// Tô nền khi khối tự mang một trạng thái (thành công, thất bại).
+  final Color? background;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      color: background,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpace.lg,
+          AppSpace.lg,
+          AppSpace.lg,
+          AppSpace.lg,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -33,20 +44,22 @@ class SectionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title, style: theme.textTheme.titleMedium),
-                      if (subtitle != null)
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
                         Text(
                           subtitle!,
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
                 ?trailing,
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpace.lg),
             child,
           ],
         ),
@@ -73,7 +86,7 @@ class LabeledField extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -92,8 +105,8 @@ class LabeledField extends StatelessWidget {
               value,
               textAlign: TextAlign.end,
               style: emphasize
-                  ? theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  ? theme.textTheme.headlineSmall?.copyWith(
+                      fontFeatures: AppTypography.tabularFigures,
                     )
                   : theme.textTheme.bodyLarge,
             ),
@@ -115,7 +128,7 @@ class DetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -128,11 +141,8 @@ class DetailRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 3,
-            child: Text(value, textAlign: TextAlign.end),
-          ),
+          const SizedBox(width: AppSpace.lg),
+          Expanded(flex: 3, child: Text(value, textAlign: TextAlign.end)),
         ],
       ),
     );
@@ -162,10 +172,11 @@ class StatusPill extends StatelessWidget {
     ),
     backgroundColor: background,
     side: BorderSide.none,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.all(Radius.circular(8)),
-    ),
+    shape: const StadiumBorder(),
     visualDensity: VisualDensity.compact,
-    padding: EdgeInsets.zero,
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpace.md,
+      vertical: AppSpace.xs,
+    ),
   );
 }

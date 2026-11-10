@@ -26,11 +26,25 @@ class GatewayOption extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(
     onTap: () => onSelect(value),
     selected: selected,
-    leading: Icon(
-      selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-      color: selected ? brand : AppColors.subtle,
+    leading: Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: selected ? brand.withValues(alpha: 0.12) : AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Icon(
+        value == 'MOMO'
+            ? Icons.account_balance_wallet_outlined
+            : Icons.credit_card,
+        color: brand,
+      ),
     ),
     title: Text(name),
     subtitle: Text(detail),
+    trailing: Icon(
+      selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+      color: selected ? brand : AppColors.subtle,
+    ),
   );
 }

@@ -40,11 +40,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.house_rounded, size: 68, color: AppColors.brand),
-          SizedBox(height: 12),
+          Icon(Icons.house_rounded, size: 64, color: AppColors.brand),
+          SizedBox(height: AppSpace.md),
           Text(
             'Trọ Tốt',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
           ),
         ],
       ),

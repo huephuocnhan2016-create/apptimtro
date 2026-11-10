@@ -45,7 +45,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   /// Tên cổng như người dùng đọc.
   String get _portalName => portalDisplayName(_s.activeGateway);
 
-
   @override
   void initState() {
     super.initState();
@@ -83,6 +82,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   @override
   Widget build(BuildContext context) {
     _s = ref.watch(paymentControllerProvider(_args));
+    final showPay =
+        _s.order != null && (_s.result == null || !_s.result!.isSettled);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -93,7 +94,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         actions: [
           if (_isSandbox)
             const Padding(
-              padding: EdgeInsets.only(right: 12),
+              padding: EdgeInsets.only(right: AppSpace.md),
               child: Chip(
                 label: Text('SANDBOX'),
                 visualDensity: VisualDensity.compact,
@@ -101,8 +102,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
             ),
         ],
       ),
+      bottomNavigationBar: showPay ? _payBar() : null,
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpace.lg,
+          AppSpace.md,
+          AppSpace.lg,
+          AppSpace.xxl,
+        ),
         children: [
           Text(
             'Giao dịch của bạn được bảo vệ bởi $_portalName.',
@@ -110,37 +117,48 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpace.lg),
           if (_s.loading)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
+              padding: EdgeInsets.symmetric(vertical: AppSpace.xxxl),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_s.order == null && widget.txnRef == null)
-            _s.error != null ? _errorCard() : _gatewayPicker()
           else ...[
-            if (_s.order != null) _infoCard(_s.order!) else _referenceCard(),
-            if (_s.order != null &&
-                (_s.result == null || !_s.result!.isSettled))
-              ...[_payButton(), _gatewaySwitch()],
-            if (_s.canCancel) _cancelButton(),
-            if (_s.error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  _s.error!,
-                  style: TextStyle(color: AppColors.failure, fontSize: 13),
+            _FlowSteps(step: _step),
+            const SizedBox(height: AppSpace.lg),
+            if (_s.order == null && widget.txnRef == null)
+              _s.error != null ? _errorCard() : _gatewayPicker()
+            else ...[
+              if (_s.order != null) _infoCard(_s.order!) else _referenceCard(),
+              if (_s.order != null &&
+                  (_s.result == null || !_s.result!.isSettled))
+                _gatewaySwitch(),
+              if (_s.canCancel) _cancelButton(),
+              if (_s.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+                  child: Text(
+                    _s.error!,
+                    style: TextStyle(color: AppColors.failure, fontSize: 13),
+                  ),
                 ),
-              ),
-            if (_s.result != null) _resultCard(_s.result!),
-            if (_s.result == null || !_s.result!.isSettled) _pendingNote(),
-            if (_s.debugLog.isNotEmpty) _debugCard(),
+              if (_s.result != null) _resultCard(_s.result!),
+              if (_s.result == null || !_s.result!.isSettled) _pendingNote(),
+              if (_s.debugLog.isNotEmpty) _debugCard(),
+            ],
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpace.md),
           _serverSignedNote(),
         ],
       ),
     );
+  }
+
+  /// Bước hiện tại của luồng cọc: 0 chọn cổng, 1 trả tiền, 2 kết quả.
+  int get _step {
+    if (_s.order == null) return 0;
+    final result = _s.result;
+    return result != null && result.isSettled ? 2 : 1;
   }
 
   bool get _isSandbox {
@@ -224,11 +242,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LabeledField(
-          label: 'Số tiền thanh toán',
-          value: formatVnd(order.amount, unit: 'VND'),
-          emphasize: true,
+        _AmountHero(
+          amount: formatVnd(order.amount, unit: 'VND'),
+          roomTitle: widget.room?.title,
         ),
+        const SizedBox(height: AppSpace.md),
         LabeledField(label: 'Nội dung thanh toán', value: order.orderInfo),
         LabeledField(
           label: 'Phương thức thanh toán',
@@ -244,12 +262,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               label: const Text('Xem mã kết quả MoMo'),
             ),
           ),
-        Text(
-          'Phòng: ${widget.room?.title}',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
       ],
     ),
   );
@@ -263,11 +275,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           Image.network(
             qrCodeUrl,
             height: 160,
-            errorBuilder: (context, error, stackTrace) => const Icon(
-              Icons.qr_code_2,
-              size: 96,
-              color: AppColors.muted,
-            ),
+            errorBuilder: (context, error, stackTrace) =>
+                const Icon(Icons.qr_code_2, size: 96, color: AppColors.muted),
           ),
           const SizedBox(height: 8),
           const Text('Quét mã bằng ứng dụng MoMo để thanh toán'),
@@ -331,8 +340,34 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     ),
   );
 
-  Widget _payButton() => Padding(
-    padding: const EdgeInsets.only(top: 4),
+  /// Nút chính nằm dính đáy màn hình — đúng vùng ngón cái, vì đây là bước
+  /// người dùng đang chờ để bấm.
+  Widget _payBar() {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.lg,
+            AppSpace.sm,
+            AppSpace.lg,
+            AppSpace.sm,
+          ),
+          child: _payButton(),
+        ),
+      ),
+    );
+  }
+
+  Widget _payButton() => SizedBox(
+    width: double.infinity,
     child: FilledButton.icon(
       onPressed: _s.launching ? null : _controller.openPortal,
       icon: _s.launching
@@ -371,6 +406,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         : AppColors.muted;
     return SectionCard(
       title: 'Trạng thái giao dịch',
+      background: settled
+          ? (result.status == 'PAID'
+                ? AppColors.successSoft
+                : AppColors.failureSoft)
+          : AppColors.neutralSoft,
       trailing: Icon(
         settled
             ? (result.status == 'PAID' ? Icons.check_circle : Icons.cancel)
@@ -382,10 +422,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         children: [
           Text(
             result.message,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
           ),
           Wrap(
             spacing: 8,
@@ -483,6 +520,128 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               ),
             ),
           ),
+      ],
+    ),
+  );
+}
+
+/// Ba bước của một lần đặt cọc, vẽ bằng dòng thời gian thay vì đoạn văn:
+/// người dùng nhìn là biết mình đang đứng ở đâu và còn lại gì.
+class _FlowSteps extends StatelessWidget {
+  const _FlowSteps({required this.step});
+
+  /// 0 = chọn cổng, 1 = trả tiền, 2 = kết quả.
+  final int step;
+
+  static const _labels = ['Chọn cổng', 'Trả tiền', 'Kết quả'];
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (var index = 0; index < _labels.length; index++) ...[
+        if (index > 0)
+          Expanded(
+            child: AnimatedContainer(
+              duration: AppMotion.enter,
+              curve: AppMotion.easeOut,
+              height: 2,
+              margin: const EdgeInsets.only(top: 11),
+              color: index <= step ? AppColors.brand : AppColors.border,
+            ),
+          ),
+        _StepDot(index: index, step: step, label: _labels[index]),
+      ],
+    ],
+  );
+}
+
+class _StepDot extends StatelessWidget {
+  const _StepDot({
+    required this.index,
+    required this.step,
+    required this.label,
+  });
+
+  final int index;
+  final int step;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = index < step;
+    final current = index == step;
+    final color = done || current ? AppColors.brand : AppColors.subtle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done || current ? AppColors.brand : AppColors.surface,
+            border: Border.all(
+              color: done || current ? AppColors.brand : AppColors.border,
+              width: 2,
+            ),
+          ),
+          child: Icon(
+            done ? Icons.check : Icons.circle,
+            size: done ? 16 : 6,
+            color: done || current ? AppColors.onBrand : color,
+          ),
+        ),
+        const SizedBox(height: AppSpace.xs),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: current ? AppColors.brand : AppColors.muted,
+            fontWeight: current ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Số tiền là con số người dùng cần đọc to nhất trên màn thanh toán.
+class _AmountHero extends StatelessWidget {
+  const _AmountHero({required this.amount, this.roomTitle});
+
+  final String amount;
+  final String? roomTitle;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(AppSpace.lg),
+    decoration: BoxDecoration(
+      color: AppColors.brandSoft,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Số tiền thanh toán',
+          style: Theme.of(context).textTheme.labelMedium
+              ?.copyWith(color: AppColors.brandDark),
+        ),
+        const SizedBox(height: AppSpace.xs),
+        Text(
+          amount,
+          style: Theme.of(context).textTheme.displaySmall
+              ?.copyWith(fontFeatures: AppTypography.tabularFigures),
+        ),
+        if (roomTitle != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            roomTitle!,
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: AppColors.muted),
+          ),
+        ],
       ],
     ),
   );

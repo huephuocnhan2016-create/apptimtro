@@ -70,7 +70,7 @@ class RoleCard extends StatelessWidget {
           backgroundColor: scheme.primaryContainer,
           child: Icon(icon, color: scheme.onPrimaryContainer),
         ),
-        title: Text(title),
+        title: Text(title, style: Theme.of(context).textTheme.titleMedium),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),
       ),
