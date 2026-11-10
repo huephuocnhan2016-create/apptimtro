@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
 import '../../../shared/widgets/async_state_view.dart';
@@ -46,16 +45,21 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
   void _search() {
     _typing?.cancel();
     if (!mounted) return;
-    setState(() => _rooms = _fetch());
+    setState(() {
+      _rooms = _fetch();
+    });
   }
 
   Future<List<Room>> _fetch() => ref.read(roomRepositoryProvider).search({
-      if (_query.text.trim().isNotEmpty) 'query': _query.text.trim(),
-      ..._filters,
-    });
+    if (_query.text.trim().isNotEmpty) 'query': _query.text.trim(),
+    ..._filters,
+  });
 
-  int get _filterCount =>
-      _filters.keys.where((key) => key != 'sort').length;
+  /// Vị trí và kiểu sắp xếp chỉ là tham số kèm theo, không phải bộ lọc — tính
+  /// chúng vào badge là người dùng thấy "3 bộ lọc" khi mới lọc mỗi giá.
+  int get _filterCount => _filters.keys.where((key) {
+    return key != 'sort' && key != 'latitude' && key != 'longitude';
+  }).length;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -115,8 +119,7 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 16),
                   itemCount: rooms.length,
-                  itemBuilder: (context, index) =>
-                      RoomCard(room: rooms[index]),
+                  itemBuilder: (context, index) => RoomCard(room: rooms[index]),
                 ),
               ),
             ),
@@ -127,122 +130,162 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
   );
 
   Future<void> _filtersDialog() async {
-    final minPrice = TextEditingController(
-      text: '${_filters['minPrice'] ?? ''}',
-    );
-    final maxPrice = TextEditingController(
-      text: '${_filters['maxPrice'] ?? ''}',
-    );
-    final minArea = TextEditingController(text: '${_filters['minArea'] ?? ''}');
-    final maxArea = TextEditingController(text: '${_filters['maxArea'] ?? ''}');
-    final rooms = TextEditingController(
-      text: '${_filters['availableRooms'] ?? ''}',
-    );
-    final radius = TextEditingController(text: '${_filters['radius'] ?? ''}');
-    final amenities = TextEditingController(
-      text: '${_filters['amenities'] ?? ''}',
-    );
-    final sort = (_filters['sort'] as String?) ?? 'newest';
-    var selectedSort = sort;
-    final apply = await showDialog<bool>(
+    final filters = await showDialog<Map<String, Object?>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Lọc phòng'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _filterField(minPrice, 'Giá từ'),
-                _filterField(maxPrice, 'Giá đến'),
-                _filterField(minArea, 'Diện tích từ'),
-                _filterField(maxArea, 'Diện tích đến'),
-                _filterField(rooms, 'Số phòng còn tối thiểu'),
-                _filterField(radius, 'Khoảng cách tối đa (km)'),
-                _filterField(amenities, 'Tiện ích, cách nhau bằng dấu phẩy'),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedSort,
-                  decoration: const InputDecoration(labelText: 'Sắp xếp'),
-                  items: const [
-                    DropdownMenuItem(value: 'newest', child: Text('Mới nhất')),
-                    DropdownMenuItem(
-                      value: 'price_asc',
-                      child: Text('Giá tăng dần'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'price_desc',
-                      child: Text('Giá giảm dần'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'distance',
-                      child: Text('Gần nhất'),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setDialogState(() => selectedSort = value ?? 'newest'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => context.pop(false),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: () => context.pop(true),
-              child: const Text('Áp dụng'),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) => _RoomFiltersDialog(initial: _filters),
     );
-    if (apply == true && mounted) {
-      try {
-        final needsLocation =
-            radius.text.isNotEmpty || selectedSort == 'distance';
-        final location = needsLocation
-            ? await ref.read(locationServiceProvider).currentPosition()
-            : null;
-        if (!mounted) return;
-        setState(() {
-          _filters = {
-            if (minPrice.text.isNotEmpty) 'minPrice': minPrice.text,
-            if (maxPrice.text.isNotEmpty) 'maxPrice': maxPrice.text,
-            if (minArea.text.isNotEmpty) 'minArea': minArea.text,
-            if (maxArea.text.isNotEmpty) 'maxArea': maxArea.text,
-            if (rooms.text.isNotEmpty) 'availableRooms': rooms.text,
-            if (amenities.text.isNotEmpty) 'amenities': amenities.text,
-            if (radius.text.isNotEmpty) 'radius': radius.text,
-            if (location != null) 'latitude': location.latitude,
-            if (location != null) 'longitude': location.longitude,
-            'sort': selectedSort,
-          };
-        });
-        _search();
-      } catch (error) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Không thể áp dụng bộ lọc: $error')),
-          );
-        }
+    if (filters == null || !mounted) return;
+    try {
+      final needsLocation =
+          filters['radius'] != null || filters['sort'] == 'distance';
+      final location = needsLocation
+          ? await ref.read(locationServiceProvider).currentPosition()
+          : null;
+      if (!mounted) return;
+      setState(() {
+        _filters = {
+          ...filters,
+          if (location != null) 'latitude': location.latitude,
+          if (location != null) 'longitude': location.longitude,
+        };
+      });
+      _search();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể áp dụng bộ lọc: $error')),
+        );
       }
     }
-    minPrice.dispose();
-    maxPrice.dispose();
-    minArea.dispose();
-    maxArea.dispose();
-    rooms.dispose();
-    radius.dispose();
-    amenities.dispose();
+  }
+}
+
+/// Server chỉ nhận số, nên "2.000.000" phải về "2000000"; chuỗi lạ thì giữ
+/// nguyên để server báo lỗi thay vì âm thầm bỏ bộ lọc.
+String _normalizeFilterNumber(String raw) {
+  final text = raw.trim();
+  return RegExp(r'^\d{1,3}([.,]\d{3})+$').hasMatch(text)
+      ? text.replaceAll(RegExp(r'[.,]'), '')
+      : text;
+}
+
+class _FilterField {
+  const _FilterField(this.key, this.label, this.input, {this.hint});
+
+  final String key;
+  final String label;
+  final TextInputType input;
+  final String? hint;
+}
+
+class _RoomFiltersDialog extends StatefulWidget {
+  const _RoomFiltersDialog({required this.initial});
+
+  final Map<String, Object?> initial;
+
+  @override
+  State<_RoomFiltersDialog> createState() => _RoomFiltersDialogState();
+}
+
+class _RoomFiltersDialogState extends State<_RoomFiltersDialog> {
+  static const _specs = [
+    _FilterField('minPrice', 'Giá từ', TextInputType.number),
+    _FilterField('maxPrice', 'Giá đến', TextInputType.number),
+    _FilterField('minArea', 'Diện tích từ', TextInputType.number),
+    _FilterField('maxArea', 'Diện tích đến', TextInputType.number),
+    _FilterField(
+      'availableRooms',
+      'Số phòng còn tối thiểu',
+      TextInputType.number,
+    ),
+    _FilterField(
+      'radius',
+      'Khoảng cách tối đa (km)',
+      TextInputType.numberWithOptions(decimal: true),
+    ),
+    _FilterField(
+      'amenities',
+      'Tiện ích, cách nhau bằng dấu phẩy',
+      TextInputType.text,
+      hint: 'Ví dụ: Wifi, Máy giặt, Điều hòa, Nước nóng',
+    ),
+  ];
+
+  late final List<TextEditingController> _fields;
+  late String _sort;
+
+  @override
+  void initState() {
+    super.initState();
+    _fields = [
+      for (final spec in _specs)
+        TextEditingController(text: '${widget.initial[spec.key] ?? ''}'),
+    ];
+    _sort = (widget.initial['sort'] as String?) ?? 'newest';
   }
 
-  Widget _filterField(TextEditingController controller, String label) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: TextField(
-          controller: controller,
-          decoration: InputDecoration(labelText: label),
-        ),
-      );
+  @override
+  void dispose() {
+    for (final field in _fields) {
+      field.dispose();
+    }
+    super.dispose();
+  }
+
+  Map<String, Object?> _result() => {
+    for (var i = 0; i < _specs.length; i++)
+      if (_fields[i].text.trim().isNotEmpty)
+        _specs[i].key: _normalizeFilterNumber(_fields[i].text),
+    'sort': _sort,
+  };
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Lọc phòng'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < _specs.length; i++) _field(_fields[i], _specs[i]),
+          DropdownButtonFormField<String>(
+            initialValue: _sort,
+            decoration: const InputDecoration(labelText: 'Sắp xếp'),
+            items: const [
+              DropdownMenuItem(value: 'newest', child: Text('Mới nhất')),
+              DropdownMenuItem(value: 'price_asc', child: Text('Giá tăng dần')),
+              DropdownMenuItem(
+                value: 'price_desc',
+                child: Text('Giá giảm dần'),
+              ),
+              DropdownMenuItem(value: 'distance', child: Text('Gần nhất')),
+            ],
+            onChanged: (value) => setState(() => _sort = value ?? 'newest'),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Hủy'),
+      ),
+      TextButton(
+        onPressed: () => Navigator.pop(context, {'sort': _sort}),
+        child: const Text('Xóa lọc'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _result()),
+        child: const Text('Áp dụng'),
+      ),
+    ],
+  );
+
+  Widget _field(TextEditingController controller, _FilterField spec) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: TextField(
+      controller: controller,
+      keyboardType: spec.input,
+      decoration: InputDecoration(labelText: spec.label, helperText: spec.hint),
+    ),
+  );
 }

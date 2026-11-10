@@ -40,7 +40,11 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
       });
 
   void _reload() {
-    if (mounted) setState(() => _room = _load());
+    if (mounted) {
+      setState(() {
+        _room = _load();
+      });
+    }
   }
 
   /// Quay về từ màn thanh toán → đọc lại phòng, để nút "Đặt cọc" đổi thành
@@ -169,7 +173,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
           title: 'Thông tin phòng',
           child: Column(
             children: [
-              DetailRow(label: 'Diện tích', value: '${formatNumber(room.area)} m²'),
+              DetailRow(
+                label: 'Diện tích',
+                value: '${formatNumber(room.area)} m²',
+              ),
               DetailRow(
                 label: 'Phòng còn trống',
                 value: '${room.availableRooms}/${room.totalRooms}',
@@ -186,7 +193,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                 value: '${formatVnd(room.electricityPrice)}/kWh',
               ),
               DetailRow(label: 'Tiền nước', value: formatVnd(room.waterPrice)),
-              DetailRow(label: 'Internet', value: formatVnd(room.internetPrice)),
+              DetailRow(
+                label: 'Internet',
+                value: formatVnd(room.internetPrice),
+              ),
               DetailRow(label: 'Tiền cọc', value: formatVnd(room.deposit)),
             ],
           ),
@@ -249,9 +259,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     : CircleAvatar(
                         foregroundImage: NetworkImage(room.landlordAvatar!),
                       ),
-                title: Text(
-                  'Chủ trọ: ${room.landlordName ?? 'Chưa cập nhật'}',
-                ),
+                title: Text('Chủ trọ: ${room.landlordName ?? 'Chưa cập nhật'}'),
               ),
               if (room.landlordPhone != null)
                 ListTile(
@@ -285,7 +293,9 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: SafeArea(
         top: false,

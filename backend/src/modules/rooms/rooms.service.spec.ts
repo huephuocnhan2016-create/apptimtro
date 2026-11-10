@@ -255,14 +255,25 @@ describe('RoomsService', () => {
       minArea: 15,
       maxArea: 30,
       availableRooms: 1,
-      amenities: 'wifi,parking',
+      amenities: 'wifi, Máy giặt ,',
     });
 
     const sql = prisma.$queryRaw.mock.calls[0][0].sql;
     expect(sql).toContain('"price" >=');
     expect(sql).toContain('"area" <=');
     expect(sql).toContain('"available_rooms" >=');
-    expect(sql).toContain('"amenities" @>');
+    expect(sql).toContain('lower(matched.name) = lower(');
+    expect(sql).toContain(' AND EXISTS ');
+  });
+
+  it('escapes LIKE wildcards typed into the keyword', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    await service.search({ query: '100%' });
+
+    const { sql, values } = prisma.$queryRaw.mock.calls[0][0];
+    expect(sql).toContain('"title" ILIKE');
+    expect(values).toContain('%100\\%%');
   });
 
   it('rejects non-landlords from room management operations', async () => {

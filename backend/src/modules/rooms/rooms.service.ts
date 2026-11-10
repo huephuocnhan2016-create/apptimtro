@@ -238,6 +238,12 @@ export class RoomsService {
       .map(({ room }) => this.serialize(room));
   }
 
+  /// `%` và `_` là ký tự đại diện của LIKE, phải giữ lại nghĩa thật để người
+  /// dùng tìm "100%" hay "2_4" không khớp toàn bộ phòng.
+  private likePattern(query: string) {
+    return `%${query.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+  }
+
   private async findRooms(dto: RoomSearchDto, nearbyRadius?: number) {
     if (dto.minPrice !== undefined && dto.maxPrice !== undefined &&
         dto.minPrice > dto.maxPrice) {
@@ -247,15 +253,27 @@ export class RoomsService {
         dto.minArea > dto.maxArea) {
       throw new BadRequestException('minArea cannot be greater than maxArea.');
     }
+    const amenities = dto.amenities
+      ?.split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const keyword = dto.query ? this.likePattern(dto.query) : undefined;
     const filters = [
       Prisma.sql`"status" IN ('AVAILABLE', 'DEPOSITED')`,
-      dto.query ? Prisma.sql`("title" ILIKE ${`%${dto.query}%`} OR "description" ILIKE ${`%${dto.query}%`} OR "address" ILIKE ${`%${dto.query}%`})` : Prisma.empty,
+      keyword
+        ? Prisma.sql`("title" ILIKE ${keyword} OR "description" ILIKE ${keyword} OR "address" ILIKE ${keyword})`
+        : Prisma.empty,
       dto.minPrice !== undefined ? Prisma.sql`"price" >= ${dto.minPrice}` : Prisma.empty,
       dto.maxPrice !== undefined ? Prisma.sql`"price" <= ${dto.maxPrice}` : Prisma.empty,
       dto.minArea !== undefined ? Prisma.sql`"area" >= ${dto.minArea}` : Prisma.empty,
       dto.maxArea !== undefined ? Prisma.sql`"area" <= ${dto.maxArea}` : Prisma.empty,
       dto.availableRooms !== undefined ? Prisma.sql`"available_rooms" >= ${dto.availableRooms}` : Prisma.empty,
-      dto.amenities ? Prisma.sql`"amenities" @> ${dto.amenities.split(',').map((item) => item.trim()).filter(Boolean)}::text[]` : Prisma.empty,
+      amenities?.length
+        ? Prisma.join(
+            amenities.map((amenity) => Prisma.sql`EXISTS (SELECT 1 FROM unnest("amenities") AS matched(name) WHERE lower(matched.name) = lower(${amenity}))`),
+            ' AND ',
+          )
+        : Prisma.empty,
       nearbyRadius !== undefined
         ? Prisma.sql`ST_DWithin("location", ST_SetSRID(ST_MakePoint(${dto.longitude!}, ${dto.latitude!}), 4326)::geography, ${nearbyRadius * 1000})`
         : dto.radius !== undefined
