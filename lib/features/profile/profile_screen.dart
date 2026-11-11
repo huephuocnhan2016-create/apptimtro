@@ -36,7 +36,8 @@ class ProfileScreen extends ConsumerWidget {
       _Menu(
         icon: Icons.chat_bubble_outline,
         title: 'Cuộc trò chuyện',
-        onTap: () => context.go('/chats'),
+        // /chats không phải tab: go sẽ dựng stack một màn, mất nút quay lại.
+        onTap: () => context.push('/chats'),
       ),
     ];
 
