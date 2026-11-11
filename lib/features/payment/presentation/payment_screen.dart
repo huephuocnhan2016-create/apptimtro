@@ -155,10 +155,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
   }
 
   /// Bước hiện tại của luồng cọc: 0 chọn cổng, 1 trả tiền, 2 kết quả.
+  /// Quay về từ link của cổng thì màn này chỉ có txnRef, không có đơn cục bộ,
+  /// nên phải xét txnRef chứ không xét đơn — nếu không thanh tiến trình nhảy
+  /// ngược về "Chọn cổng" dù giao dịch đã thành công.
   int get _step {
-    if (_s.order == null) return 0;
-    final result = _s.result;
-    return result != null && result.isSettled ? 2 : 1;
+    if (_s.result != null && _s.result!.isSettled) return 2;
+    if (_s.order == null && _s.activeTxnRef == null) return 0;
+    return 1;
   }
 
   bool get _isSandbox {

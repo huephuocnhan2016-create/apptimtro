@@ -155,9 +155,8 @@ List<String> _recordLaunches(
         return !fail.contains(url);
       });
   addTearDown(
-    () =>
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, null),
+    () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null),
   );
   return launched;
 }
@@ -251,6 +250,7 @@ void main() {
     expect(find.text('12345'), findsOne);
     expect(find.text('09/11/2026 10:27:08'), findsOne);
     expect(find.text('Thanh toán ngay'), findsNothing);
+    expect(find.byIcon(Icons.check), findsNWidgets(2));
   });
 
   testWidgets('labels a paid MoMo transaction as MoMo', (tester) async {
@@ -322,6 +322,19 @@ void main() {
     expect(find.text('Mã 00'), findsOne);
     expect(find.text('Thanh toán ngay'), findsNothing);
     expect(find.text('Phòng trọ Minh Thạnh'), findsNothing);
+    // Hai dấu check = đang ở bước "Kết quả". Màn này không có đơn cục bộ nên
+    // trước đây thanh tiến trình tụt về bước "Chọn cổng".
+    expect(find.byIcon(Icons.check), findsNWidgets(2));
+  });
+
+  testWidgets('keeps the progress bar on paying while the portal is pending', (
+    tester,
+  ) async {
+    await _pump(tester, _FakePaymentApi(), txnRef: '20261109ABCD');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đang xử lý'), findsOne);
+    expect(find.byIcon(Icons.check), findsNWidgets(1));
   });
 
   testWidgets('opens the MoMo wallet before the web page', (tester) async {
@@ -335,7 +348,10 @@ void main() {
   testWidgets('falls back to the web when the wallet app is missing', (
     tester,
   ) async {
-    final launched = _recordLaunches(tester, fail: {'momo://payment?token=abc'});
+    final launched = _recordLaunches(
+      tester,
+      fail: {'momo://payment?token=abc'},
+    );
     await _checkout(tester, _FakePaymentApi(), gateway: 'MOMO');
     await _tap(tester, find.widgetWithText(FilledButton, 'Thanh toán ngay'));
 
@@ -352,7 +368,9 @@ void main() {
     await _checkout(tester, _FakePaymentApi());
     await _tap(tester, find.widgetWithText(FilledButton, 'Thanh toán ngay'));
 
-    expect(launched, ['http://10.0.2.2:3300/api/payment/dev/checkout/20261109ABCD']);
+    expect(launched, [
+      'http://10.0.2.2:3300/api/payment/dev/checkout/20261109ABCD',
+    ]);
   });
 
   testWidgets('shows the MoMo QR and its result codes', (tester) async {
