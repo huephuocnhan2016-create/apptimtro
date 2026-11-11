@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/async_state_view.dart';
@@ -40,20 +41,14 @@ class _DepositListScreenState extends ConsumerState<DepositListScreen> {
     try {
       await ref.read(paymentApiProvider).cancel(deposit.txnRef);
       if (!mounted) return;
-      setState(() {
-        _cancellingTxnRef = null;
-        _deposits = ref.read(paymentApiProvider).deposits();
-      });
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Đã hủy đặt cọc.')));
+      setState(() => _cancellingTxnRef = null);
+      _reload();
+      ScaffoldMessenger.of(context).snack('Đã hủy đặt cọc.');
     } catch (error) {
       if (!mounted) return;
       setState(() => _cancellingTxnRef = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Không hủy được đặt cọc: ${apiErrorMessage(error)}'),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+          .snack('Không hủy được đặt cọc: ${apiErrorMessage(error)}');
     }
   }
 

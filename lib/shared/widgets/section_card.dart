@@ -46,12 +46,7 @@ class SectionCard extends StatelessWidget {
                       Text(title, style: theme.textTheme.titleMedium),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
-                        Text(
-                          subtitle!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                        Text(subtitle!, style: theme.textTheme.bodyMedium),
                       ],
                     ],
                   ),
@@ -92,12 +87,7 @@ class LabeledField extends StatelessWidget {
         children: [
           Expanded(
             flex: 2,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+            child: Text(label, style: theme.textTheme.bodyMedium),
           ),
           Expanded(
             flex: 3,
@@ -134,12 +124,7 @@ class DetailRow extends StatelessWidget {
         children: [
           Expanded(
             flex: 2,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+            child: Text(label, style: theme.textTheme.bodyMedium),
           ),
           const SizedBox(width: AppSpace.lg),
           Expanded(flex: 3, child: Text(value, textAlign: TextAlign.end)),

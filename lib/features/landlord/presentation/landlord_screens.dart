@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/async_state_view.dart';
@@ -200,8 +201,9 @@ class _MyRoomsScreenState extends ConsumerState<MyRoomsScreen> {
                                     room.address,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(color: AppColors.muted),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
                                   ),
                                   const SizedBox(height: AppSpace.sm),
                                   Text.rich(
@@ -325,9 +327,7 @@ class _MyRoomsScreenState extends ConsumerState<MyRoomsScreen> {
       _reload();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể cập nhật phòng: $error')),
-        );
+        ScaffoldMessenger.of(context).snack('Không thể cập nhật phòng: $error');
       }
     }
   }
@@ -403,8 +403,7 @@ class _AvailabilityDialogState extends State<_AvailabilityDialog> {
       children: [
         Text(
           'Tin đăng này có ${widget.room.totalRooms} phòng. Đặt 0 khi đã kín hết.',
-          style: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(color: AppColors.muted),
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: AppSpace.lg),
         TextField(

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -99,33 +99,11 @@ final _routes = <RouteBase>[
   ),
   GoRoute(
     path: '/register/student',
-    builder: (_, state) {
-      final extra = state.extra;
-      if (extra is! Map<String, Object> ||
-          extra['phone'] is! String ||
-          extra['verificationToken'] is! String) {
-        return const AuthFlowExpiredScreen();
-      }
-      return StudentRegisterScreen(
-        phone: extra['phone']! as String,
-        verificationToken: extra['verificationToken']! as String,
-      );
-    },
+    builder: (_, state) => _registerScreen(UserRole.student, state),
   ),
   GoRoute(
     path: '/register/landlord',
-    builder: (_, state) {
-      final extra = state.extra;
-      if (extra is! Map<String, Object> ||
-          extra['phone'] is! String ||
-          extra['verificationToken'] is! String) {
-        return const AuthFlowExpiredScreen();
-      }
-      return LandlordRegisterScreen(
-        phone: extra['phone']! as String,
-        verificationToken: extra['verificationToken']! as String,
-      );
-    },
+    builder: (_, state) => _registerScreen(UserRole.landlord, state),
   ),
   // 4 tab chính dùng chung một thanh điều hướng; mỗi tab giữ lịch sử riêng.
   StatefulShellRoute.indexedStack(
@@ -227,3 +205,19 @@ final _routes = <RouteBase>[
     },
   ),
 ];
+
+/// Hai route đăng ký chỉ khác vai trò. Thiếu payload nghĩa là người dùng mở
+/// lại link cũ sau khi app khởi động lại → màn hết phiên.
+Widget _registerScreen(UserRole role, GoRouterState state) {
+  final extra = state.extra;
+  if (extra is! Map<String, Object> ||
+      extra['phone'] is! String ||
+      extra['verificationToken'] is! String) {
+    return const AuthFlowExpiredScreen();
+  }
+  return RegisterFormScreen(
+    phone: extra['phone']! as String,
+    verificationToken: extra['verificationToken']! as String,
+    role: role,
+  );
+}

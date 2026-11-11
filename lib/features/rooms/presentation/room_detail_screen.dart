@@ -10,6 +10,7 @@ import '../../../core/network/api_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/async_state_view.dart';
 import '../../map/presentation/open_street_map_layers.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/rating_stars.dart';
@@ -72,13 +73,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
       if (mounted) setState(() => _favorite = !_favorite);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Không thể cập nhật yêu thích: ${apiErrorMessage(error)}',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .snack('Không thể cập nhật yêu thích: ${apiErrorMessage(error)}');
       }
     }
   }
@@ -98,11 +94,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
       _reload();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Không gửi được đánh giá: ${apiErrorMessage(error)}'),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .snack('Không gửi được đánh giá: ${apiErrorMessage(error)}');
       }
     }
   }
@@ -110,9 +103,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   Future<void> _copyPhone(Room room) async {
     await Clipboard.setData(ClipboardData(text: room.landlordPhone!));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã sao chép số điện thoại')),
-      );
+      ScaffoldMessenger.of(context).snack('Đã sao chép số điện thoại');
     }
   }
 
@@ -171,18 +162,12 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               const SizedBox(height: AppSpace.xs),
               Row(
                 children: [
-                  Icon(
-                    Icons.place_outlined,
-                    size: 16,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  const Icon(Icons.place_outlined, size: 16),
                   const SizedBox(width: AppSpace.xs),
                   Expanded(
                     child: Text(
                       room.address,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ),
                 ],
@@ -326,23 +311,20 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                 ),
                 subtitle: const Text('Chủ trọ'),
               ),
-              if (room.landlordPhone != null)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phone_outlined),
-                  title: SelectableText(room.landlordPhone!),
-                  trailing: IconButton(
-                    tooltip: 'Sao chép số điện thoại',
-                    icon: const Icon(Icons.copy),
-                    onPressed: () => _copyPhone(room),
-                  ),
-                )
-              else
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phone_outlined),
-                  title: const Text('SĐT chủ trọ: Chưa cập nhật'),
-                ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phone_outlined),
+                title: room.landlordPhone == null
+                    ? const Text('SĐT chủ trọ: Chưa cập nhật')
+                    : SelectableText(room.landlordPhone!),
+                trailing: room.landlordPhone == null
+                    ? null
+                    : IconButton(
+                        tooltip: 'Sao chép số điện thoại',
+                        icon: const Icon(Icons.copy),
+                        onPressed: () => _copyPhone(room),
+                      ),
+              ),
             ],
           ),
         ),
@@ -392,9 +374,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Chỉ sinh viên đã đặt cọc phòng này mới bình luận và đánh giá được.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: theme.textTheme.bodySmall,
                   ),
                 ),
             ],
@@ -432,9 +412,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               ),
               Text(
                 formatDateVn(review.createdAt),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                style: theme.textTheme.bodySmall,
               ),
             ],
           ),
@@ -482,12 +460,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                       fontFeatures: AppTypography.tabularFigures,
                     ),
                   ),
-                  Text(
-                    'mỗi tháng',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  Text('mỗi tháng', style: theme.textTheme.bodySmall),
                 ],
               ),
               const Spacer(),
@@ -651,12 +624,7 @@ class _Fact extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          Text(label, style: theme.textTheme.bodySmall),
         ],
       ),
     );

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../domain/user.dart';
 import 'auth_controller.dart';
@@ -30,9 +31,8 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
   Future<void> _send() async {
     final phone = _phone.text.replaceAll(RegExp(r'\s+'), '');
     if (!RegExp(r'^\+?[\d]{9,12}$').hasMatch(phone)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập số điện thoại hợp lệ.')),
-      );
+      ScaffoldMessenger.of(context)
+          .snack('Vui lòng nhập số điện thoại hợp lệ.');
       return;
     }
     final sent = await ref
@@ -175,8 +175,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       _devOtp = sent.devOtp;
       _startCountdown();
     });
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Đã gửi lại mã OTP.')));
+    ScaffoldMessenger.of(context).snack('Đã gửi lại mã OTP.');
   }
 
   void _changePhone() {
@@ -293,8 +292,7 @@ class _DevOtpBanner extends StatelessWidget {
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: devOtp));
             if (!context.mounted) return;
-            ScaffoldMessenger.of(context)
-                .showSnackBar(const SnackBar(content: Text('Đã copy mã OTP.')));
+            ScaffoldMessenger.of(context).snack('Đã copy mã OTP.');
           },
         ),
       ],

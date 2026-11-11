@@ -14,10 +14,19 @@ import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../map/presentation/open_street_map_layers.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_network_image.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../domain/room.dart';
+
+/// "Wifi, , Điều hòa" → ["Wifi", "Điều hòa"]. Tiện ích lưu một chuỗi phân cách
+/// dấu phẩy nên cả lúc đọc lẫn lúc lưu phải tách theo cùng một quy tắc.
+List<String> _splitCsv(String value) => value
+    .split(',')
+    .map((item) => item.trim())
+    .where((item) => item.isNotEmpty)
+    .toList();
 
 class RoomForm extends ConsumerStatefulWidget {
   const RoomForm({this.room, super.key});
@@ -239,8 +248,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
           if (existing.isNotEmpty) ...[
             Text(
               'Ảnh đang hiển thị (${existing.length})',
-              style: Theme.of(context).textTheme.labelMedium
-                  ?.copyWith(color: AppColors.muted),
+              style: Theme.of(context).textTheme.labelMedium,
             ),
             const SizedBox(height: AppSpace.sm),
             SizedBox(
@@ -287,8 +295,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
             const SizedBox(height: AppSpace.sm),
             Text(
               'Ảnh mới sẽ được tải lên khi bạn lưu phòng.',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: AppColors.muted),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ],
@@ -330,10 +337,8 @@ class _RoomFormState extends ConsumerState<RoomForm> {
           const SizedBox(width: AppSpace.md),
           Text(
             'Còn $shown/$total phòng trống',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppColors.muted,
-              fontFeatures: AppTypography.tabularFigures,
-            ),
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(fontFeatures: AppTypography.tabularFigures),
           ),
         ],
       ),
@@ -437,18 +442,20 @@ class _RoomFormState extends ConsumerState<RoomForm> {
               'Tọa độ: ${position.latitude.toStringAsFixed(6)}, '
               '${position.longitude.toStringAsFixed(6)}. '
               'Chạm vào bản đồ để chỉnh lại.',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: AppColors.muted),
+              style: Theme.of(context).textTheme.bodySmall,
             )
           else
             Text(
               'Địa chỉ đã nhập sẽ được lưu cùng tin đăng.',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: AppColors.muted),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
         ],
       ),
     );
+  }
+
+  void _setAddressError(String? message) {
+    if (mounted) setState(() => _addressError = message);
   }
 
   Future<void> _useCurrentLocation() async {
@@ -461,19 +468,15 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       if (!mounted) return;
       _setMapPosition(LatLng(current.latitude, current.longitude));
     } on StateError catch (error) {
-      if (mounted) setState(() => _addressError = error.message);
+      _setAddressError(error.message);
     } on PlatformException {
-      if (mounted) {
-        setState(() {
-          _addressError = 'Không lấy được vị trí. Hãy cấp quyền vị trí và bật GPS trên thiết bị.';
-        });
-      }
+      _setAddressError(
+        'Không lấy được vị trí. Hãy cấp quyền vị trí và bật GPS trên thiết bị.',
+      );
     } on TimeoutException {
-      if (mounted) {
-        setState(() {
-          _addressError = 'Không nhận được tín hiệu GPS. Hãy thử lại hoặc chọn vị trí trên bản đồ.';
-        });
-      }
+      _setAddressError(
+        'Không nhận được tín hiệu GPS. Hãy thử lại hoặc chọn vị trí trên bản đồ.',
+      );
     } finally {
       if (mounted) setState(() => _gettingCurrentLocation = false);
     }
@@ -626,11 +629,7 @@ class _RoomFormState extends ConsumerState<RoomForm> {
           'latitude': null,
           'longitude': null,
         },
-        'amenities': _fields['amenities']!.text
-            .split(',')
-            .map((value) => value.trim())
-            .where((value) => value.isNotEmpty)
-            .toList(),
+        'amenities': _splitCsv(_fields['amenities']!.text),
       };
       final repository = ref.read(roomRepositoryProvider);
       final saved = widget.room == null
@@ -651,31 +650,20 @@ class _RoomFormState extends ConsumerState<RoomForm> {
       final hasNoMapPin = saved.latitude == null || saved.longitude == null;
       context.go(widget.room == null ? '/home' : '/landlord/rooms');
       if (failedUploads > 0) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'Đã lưu phòng nhưng $failedUploads/${_images.length} ảnh '
-              'tải lên không thành công. Hãy sửa phòng để thêm lại ảnh.',
-            ),
-          ),
+        messenger.snack(
+          'Đã lưu phòng nhưng $failedUploads/${_images.length} ảnh '
+          'tải lên không thành công. Hãy sửa phòng để thêm lại ảnh.',
         );
       } else if (hasNoMapPin) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Đã lưu phòng nhưng chưa xác định được vị trí ghim. '
-              'Hãy chỉnh sửa phòng và chọn vị trí trên bản đồ.',
-            ),
-          ),
+        messenger.snack(
+          'Đã lưu phòng nhưng chưa xác định được vị trí ghim. '
+          'Hãy chỉnh sửa phòng và chọn vị trí trên bản đồ.',
         );
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Không thể lưu phòng: ${apiErrorMessage(error)}'),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .snack('Không thể lưu phòng: ${apiErrorMessage(error)}');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -735,27 +723,12 @@ class _AmenityPickerState extends State<_AmenityPicker> {
 
   final _custom = TextEditingController();
 
-  List<String> get _selected => widget.controller.text
-      .split(',')
-      .map((value) => value.trim())
-      .where((value) => value.isNotEmpty)
-      .toList();
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onChanged);
-  }
+  List<String> get _selected => _splitCsv(widget.controller.text);
 
   @override
   void dispose() {
-    widget.controller.removeListener(_onChanged);
     _custom.dispose();
     super.dispose();
-  }
-
-  void _onChanged() {
-    if (mounted) setState(() {});
   }
 
   void _toggle(String value) {
@@ -774,55 +747,60 @@ class _AmenityPickerState extends State<_AmenityPicker> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final selected = _selected;
-    final options = <String>[
-      ..._presets,
-      ...selected.where((value) => !_presets.contains(value)),
-    ];
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpace.xs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Tiện ích',
-            style: Theme.of(context).textTheme.labelLarge
-                ?.copyWith(color: AppColors.muted),
-          ),
-          const SizedBox(height: AppSpace.sm),
-          Wrap(
-            spacing: AppSpace.sm,
-            runSpacing: AppSpace.sm,
-            children: [
-              for (final option in options)
-                FilterChip(
-                  label: Text(option),
-                  selected: selected.contains(option),
-                  onSelected: (_) => _toggle(option),
+  Widget build(BuildContext context) => ListenableBuilder(
+    // Controller tiện ích thuộc về form cha, nên phải nghe nó trực tiếp thay
+    // vì addListener + setState thủ công.
+    listenable: widget.controller,
+    builder: (context, _) {
+      final selected = _selected;
+      final options = <String>[
+        ..._presets,
+        ...selected.where((value) => !_presets.contains(value)),
+      ];
+      return Padding(
+        padding: const EdgeInsets.only(top: AppSpace.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tiện ích',
+              style: Theme.of(context).textTheme.labelLarge
+                  ?.copyWith(color: AppColors.muted),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                for (final option in options)
+                  FilterChip(
+                    label: Text(option),
+                    selected: selected.contains(option),
+                    onSelected: (_) => _toggle(option),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.md),
+            TextField(
+              controller: _custom,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _addCustom(),
+              decoration: InputDecoration(
+                labelText: 'Tiện ích khác',
+                hintText: 'VD: ban công rộng',
+                suffixIcon: IconButton(
+                  tooltip: 'Thêm tiện ích',
+                  icon: const Icon(Icons.add),
+                  onPressed: _addCustom,
                 ),
-            ],
-          ),
-          const SizedBox(height: AppSpace.md),
-          TextField(
-            controller: _custom,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _addCustom(),
-            decoration: InputDecoration(
-              labelText: 'Tiện ích khác',
-              hintText: 'VD: ban công rộng',
-              suffixIcon: IconButton(
-                tooltip: 'Thêm tiện ích',
-                icon: const Icon(Icons.add),
-                onPressed: _addCustom,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
+    },
+  );
 }
 
 /// Ảnh vừa chọn trên máy, bấm để bỏ trước khi lưu.

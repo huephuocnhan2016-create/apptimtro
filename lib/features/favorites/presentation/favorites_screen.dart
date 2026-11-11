@@ -6,6 +6,7 @@ import '../../../core/providers.dart';
 import '../../../core/network/api_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../rooms/domain/room.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/widgets/async_state_view.dart';
 import '../../../shared/widgets/room_card.dart';
 
@@ -86,12 +87,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                     return true;
                   } catch (error) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Không thể bỏ yêu thích: ${apiErrorMessage(error)}',
-                          ),
-                        ),
+                      ScaffoldMessenger.of(context).snack(
+                        'Không thể bỏ yêu thích: ${apiErrorMessage(error)}',
                       );
                     }
                     return false;

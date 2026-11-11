@@ -81,15 +81,40 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           theme: AppTheme.light,
-          home: const LandlordRegisterScreen(
+          home: const RegisterFormScreen(
             phone: '+84987654321',
             verificationToken: 'token',
+            role: UserRole.landlord,
           ),
         ),
       ),
     );
 
     expect(tester.takeException(), isNull);
+    await tester.scrollUntilVisible(
+      find.text('Hoàn tất đăng ký'),
+      80,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Hoàn tất đăng ký'), findsOneWidget);
+  });
+
+  testWidgets('form đăng ký sinh viên không có ô email', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const RegisterFormScreen(
+            phone: '+84987654321',
+            verificationToken: 'token',
+            role: UserRole.student,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Họ và tên'), findsOneWidget);
+    expect(find.text('Email'), findsNothing);
     await tester.scrollUntilVisible(
       find.text('Hoàn tất đăng ký'),
       80,

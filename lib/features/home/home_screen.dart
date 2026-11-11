@@ -81,13 +81,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 future: _suggested,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return _HomeError(
-                      message:
-                          'Không tải được gợi ý: ${apiErrorMessage(snapshot.error!)}',
-                      onRetry: () => setState(_reload),
+                    return SizedBox(
+                      height: 200,
+                      child: ErrorStateView(
+                        message:
+                            'Không tải được gợi ý: ${apiErrorMessage(snapshot.error!)}',
+                        onRetry: () => setState(_reload),
+                      ),
                     );
                   }
-                  if (!snapshot.hasData) return const _HomeLoading();
+                  // Giữ chiều cao dành sẵn để danh sách không giật khi dữ liệu về.
+                  if (!snapshot.hasData) {
+                    return const SizedBox(
+                      height: 160,
+                      child: LoadingStateView(),
+                    );
+                  }
                   return _Suggestions(rooms: snapshot.data!);
                 },
               ),
@@ -130,27 +139,4 @@ class _Suggestions extends StatelessWidget {
       ],
     );
   }
-}
-
-class _HomeLoading extends StatelessWidget {
-  const _HomeLoading();
-
-  @override
-  Widget build(BuildContext context) => const SizedBox(
-    height: 160,
-    child: Center(child: CircularProgressIndicator()),
-  );
-}
-
-class _HomeError extends StatelessWidget {
-  const _HomeError({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 200,
-    child: ErrorStateView(message: message, onRetry: onRetry),
-  );
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error_message.dart';
 import '../../../core/providers.dart';
+import '../../../shared/app_toast.dart';
 import '../data/auth_api.dart';
 import '../data/auth_repository.dart';
 import '../domain/user.dart';
@@ -83,5 +84,5 @@ void showAuthError(BuildContext context, WidgetRef ref) {
   final message = error is AuthException
       ? error.message
       : apiErrorMessage(error);
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  ScaffoldMessenger.of(context).snack(message);
 }

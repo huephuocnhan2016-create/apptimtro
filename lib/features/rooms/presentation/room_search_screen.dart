@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/widgets/async_state_view.dart';
 import '../../../shared/widgets/room_card.dart';
 import '../domain/room.dart';
@@ -86,13 +87,8 @@ class _RoomSearchScreenState extends ConsumerState<RoomSearchScreen> {
         // phần phụ thuộc vị trí và báo một lần — trước đây cả sheet lọc bị vứt.
         position = null;
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Không lấy được vị trí nên bỏ lọc theo khoảng cách.',
-              ),
-            ),
-          );
+          ScaffoldMessenger.of(context)
+              .snack('Không lấy được vị trí nên bỏ lọc theo khoảng cách.');
         }
       }
     }

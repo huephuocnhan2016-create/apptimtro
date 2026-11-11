@@ -13,13 +13,9 @@ abstract final class AppColors {
   static const brandSoft = Color(0xFFE7F1F3); // nền nhạt sau icon / ô được chọn
   static const onBrand = Colors.white;
   static const onBrandMuted = Color(0xCCFFFFFF); // chữ phụ trên nền brand
-  static const onBrandOverlay = Color(
-    0x33FFFFFF,
-  ); // pill trong suốt trên nền brand
 
   // MoMo (màu đối tác, giữ đúng nhận diện)
   static const momo = Color(0xFFD1001B);
-  static const momoDark = Color(0xFF9E0014);
 
   // Chữ & nền trung tính ấm
   static const ink = Color(0xFF1A1D1B);
@@ -75,22 +71,14 @@ abstract final class AppSpace {
 }
 
 /// Nhịp động dùng chung. Quy tắc: phản hồi bấm <160ms, phần tử vào màn
-/// ~220ms, sheet ~320ms; không bao giờ animate hành động lặp nhiều lần/ngày.
+/// ~220ms; không bao giờ animate hành động lặp nhiều lần/ngày.
 abstract final class AppMotion {
   static const press = Duration(milliseconds: 140);
   static const enter = Duration(milliseconds: 220);
-  static const exit = Duration(milliseconds: 180);
-  static const sheet = Duration(milliseconds: 320);
   static const stagger = Duration(milliseconds: 40);
 
   /// ease-out mạnh: bắt đầu nhanh, người dùng thấy hệ thống nghe mình ngay.
   static const easeOut = Cubic(0.23, 1, 0.32, 1);
-
-  /// cho phần tử đổi chỗ trên màn.
-  static const easeInOut = Cubic(0.77, 0, 0.175, 1);
-
-  /// cong drawer kiểu iOS cho sheet.
-  static const drawer = Cubic(0.32, 0.72, 0, 1);
 }
 
 abstract final class AppTypography {

@@ -113,9 +113,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         children: [
           Text(
             'Giao dịch của bạn được bảo vệ bởi $_portalName.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpace.lg),
           if (_s.loading)
@@ -639,11 +637,7 @@ class _AmountHero extends StatelessWidget {
         ),
         if (roomTitle != null) ...[
           const SizedBox(height: 2),
-          Text(
-            roomTitle!,
-            style: Theme.of(context).textTheme.bodyMedium
-                ?.copyWith(color: AppColors.muted),
-          ),
+          Text(roomTitle!, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ],
     ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../rooms/domain/room.dart';
+import '../../../shared/app_toast.dart';
 import '../../../shared/format.dart';
 import '../../../shared/widgets/async_state_view.dart';
 import '../domain/message.dart';
@@ -93,9 +94,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           .send(session.conversationId, session.myUid, text);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không gửi được tin nhắn.')),
-        );
+        ScaffoldMessenger.of(context).snack('Không gửi được tin nhắn.');
       }
     }
   }
@@ -268,12 +267,7 @@ class _MessageBubble extends StatelessWidget {
             children: [
               Text(message.text),
               if (time.isNotEmpty)
-                Text(
-                  time,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
+                Text(time, style: theme.textTheme.labelSmall),
             ],
           ),
         ),

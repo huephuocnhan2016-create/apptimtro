@@ -41,6 +41,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _loadNearby();
   }
 
+  /// "Vị trí hiện tại" và "Thử lại" cùng một hành động: nạp lại theo vị trí mới.
+  void _retry() {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    _loadNearby();
+  }
+
+  /// Banner nổi trên bản đồ, luôn dính mép trên — không dùng state rỗng/lỗi
+  /// toàn màn vì sẽ che mất khu vực đang xem.
+  Widget _topBanner(Widget child) => Align(
+    alignment: Alignment.topCenter,
+    child: Card(
+      margin: const EdgeInsets.all(AppSpace.md),
+      child: Padding(padding: const EdgeInsets.all(AppSpace.md), child: child),
+    ),
+  );
+
   Future<void> _loadNearby() async {
     try {
       final locationService = ref.read(locationServiceProvider);
@@ -189,15 +208,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             bottom: AppSpace.xxl,
             child: FloatingActionButton.small(
               tooltip: 'Vị trí hiện tại',
-              onPressed: _loading
-                  ? null
-                  : () {
-                      setState(() {
-                        _loading = true;
-                        _error = null;
-                      });
-                      _loadNearby();
-                    },
+              onPressed: _loading ? null : _retry,
               child: const Icon(Icons.my_location),
             ),
           ),
@@ -248,42 +259,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               child: LinearProgressIndicator(),
             )
           else if (_error != null)
-            Align(
-              alignment: Alignment.topCenter,
-              child: Card(
-                margin: const EdgeInsets.all(AppSpace.md),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpace.md),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_error!, textAlign: TextAlign.center),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _loading = true;
-                            _error = null;
-                          });
-                          _loadNearby();
-                        },
-                        child: const Text('Thử lại'),
-                      ),
-                    ],
-                  ),
-                ),
+            _topBanner(
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!, textAlign: TextAlign.center),
+                  TextButton(onPressed: _retry, child: const Text('Thử lại')),
+                ],
               ),
             )
           else if (_rooms.isEmpty)
-            Align(
-              alignment: Alignment.topCenter,
-              child: Card(
-                margin: const EdgeInsets.all(AppSpace.md),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpace.md),
-                  child: Text(
-                    'Không tìm thấy phòng trong bán kính ${_radiusKm.toStringAsFixed(0)} km.',
-                  ),
-                ),
+            _topBanner(
+              Text(
+                'Không tìm thấy phòng trong bán kính ${_radiusKm.toStringAsFixed(0)} km.',
               ),
             ),
         ],
@@ -394,12 +382,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
                 ),
               Text(room.title, style: Theme.of(context).textTheme.titleLarge),
-              Text(
-                room.address,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+              Text(room.address, style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: AppSpace.md),
               Row(
                 children: [
