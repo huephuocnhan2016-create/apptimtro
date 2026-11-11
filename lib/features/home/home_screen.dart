@@ -8,7 +8,6 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/async_state_view.dart';
 import '../../shared/widgets/room_card.dart';
 import '../../shared/widgets/staggered_enter.dart';
-import '../auth/domain/user.dart';
 import '../rooms/domain/room.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -33,8 +32,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLandlord =
-        ref.watch(currentUserProvider)?.role == UserRole.landlord;
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -68,75 +65,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('Gợi ý cho bạn', style: text.titleLarge),
-                  ),
-                  TextButton(
-                    onPressed: () => context.push('/rooms/search'),
-                    child: const Text('Xem tất cả'),
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.lg,
+                0,
+                AppSpace.lg,
+                AppSpace.md,
               ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: FutureBuilder<List<Room>>(
-              future: _suggested,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return _HomeError(
-                    message:
-                        'Không tải được gợi ý: ${apiErrorMessage(snapshot.error!)}',
-                    onRetry: () => setState(_reload),
-                  );
-                }
-                if (!snapshot.hasData) return const _HomeLoading();
-                return _Suggestions(rooms: snapshot.data!);
-              },
+              child: Text('Gợi ý cho bạn', style: text.titleLarge),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpace.lg,
-                AppSpace.xl,
-                AppSpace.lg,
-                AppSpace.xxxl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('Lối tắt', style: text.titleLarge),
-                  const SizedBox(height: AppSpace.md),
-                  _ShortcutRow(
-                    items: [
-                      // /map là một tab: chuyển tab (go) để thanh điều hướng
-                      // sáng đúng.
-                      _Shortcut(
-                        Icons.map_outlined,
-                        'Bản đồ',
-                        'Phòng gần bạn',
-                        () => context.go('/map'),
-                      ),
-                      _Shortcut(
-                        Icons.chat_bubble_outline,
-                        'Tin nhắn',
-                        'Trao đổi chủ trọ',
-                        () => context.push('/chats'),
-                      ),
-                      if (isLandlord)
-                        _Shortcut(
-                          Icons.home_work_outlined,
-                          'Quản lý',
-                          'Đăng & sửa tin',
-                          () => context.push('/landlord'),
-                        ),
-                    ],
-                  ),
-                ],
+              padding: const EdgeInsets.only(bottom: AppSpace.xl),
+              child: FutureBuilder<List<Room>>(
+                future: _suggested,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return _HomeError(
+                      message:
+                          'Không tải được gợi ý: ${apiErrorMessage(snapshot.error!)}',
+                      onRetry: () => setState(_reload),
+                    );
+                  }
+                  if (!snapshot.hasData) return const _HomeLoading();
+                  return _Suggestions(rooms: snapshot.data!);
+                },
               ),
             ),
           ),
@@ -199,67 +152,5 @@ class _HomeError extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     height: 200,
     child: ErrorStateView(message: message, onRetry: onRetry),
-  );
-}
-
-class _Shortcut {
-  const _Shortcut(this.icon, this.title, this.subtitle, this.onTap);
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-}
-
-class _ShortcutRow extends StatelessWidget {
-  const _ShortcutRow({required this.items});
-
-  final List<_Shortcut> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Row(
-      children: [
-        for (var index = 0; index < items.length; index++)
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(
-                right: index < items.length - 1 ? AppSpace.md : 0,
-              ),
-              child: _ShortcutCard(shortcut: items[index], text: text),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ShortcutCard extends StatelessWidget {
-  const _ShortcutCard({required this.shortcut, required this.text});
-
-  final _Shortcut shortcut;
-  final TextTheme text;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: shortcut.onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpace.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(shortcut.icon, color: AppColors.brand),
-            const SizedBox(height: AppSpace.lg),
-            Text(shortcut.title, style: text.titleMedium),
-            const SizedBox(height: 2),
-            Text(shortcut.subtitle, maxLines: 2, style: text.bodyMedium),
-          ],
-        ),
-      ),
-    ),
   );
 }
